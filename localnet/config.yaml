@@ -1,0 +1,24 @@
+# cometbft-mcp config for the local test network (see docker-compose.yml).
+# val0 runs behind the sentry; val1-3 peer with each other and the sentry.
+nodes:
+  - name: sentry
+    role: sentry
+    rpc: http://127.0.0.1:26657
+    metrics: http://127.0.0.1:26660
+  - name: val0
+    role: validator
+    rpc: http://127.0.0.1:26757
+    metrics: http://127.0.0.1:26760
+    validator_address: cosmosvalcons13x3ggf902z07z2n7mue4enjjruzu3s25368anl
+  - name: val1
+    role: validator
+    rpc: http://127.0.0.1:26857
+    validator_address: cosmosvalcons1s642j4efnfgw24qr9g4qdjrawxekxkutkwcz24
+  - name: val2
+    role: validator
+    rpc: http://127.0.0.1:26957
+    validator_address: cosmosvalcons1gfa7ffujpkhsjxj3lkutwrduq7xx2zklwxpv5j
+  - name: val3
+    role: validator
+    rpc: http://127.0.0.1:27057
+    validator_address: cosmosvalcons1d6nn89hg6u75jghswz50aw7j35nws58uzcwpe5

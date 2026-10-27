@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": -1,
+  "result": {
+    "response": {
+      "data": "SimApp",
+      "last_block_height": "22",
+      "last_block_app_hash": "5DRhPgjpoEwQjhRvs67TpauZDJ037RzcE7xYoucvXnw="
+    }
+  }
+}
