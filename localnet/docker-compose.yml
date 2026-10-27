@@ -1,0 +1,66 @@
+# Local CometBFT test network: 4 simd validators + 1 sentry.
+#
+#   make localnet-up      build image, init once, start
+#   make localnet-down    stop and delete all chain data
+#
+# Host ports (RPC / Prometheus metrics):
+#   sentry 26657 / 26660   (+ REST 1317)
+#   val0   26757 / 26760   val1 26857 / 26860
+#   val2   26957 / 26960   val3 27057 / 27060
+
+x-node: &node
+  image: cometbft-mcp/simd:v0.54.4
+  volumes:
+    - localnet-data:/data
+  depends_on:
+    init:
+      condition: service_completed_successfully
+  restart: unless-stopped
+
+services:
+  init:
+    image: cometbft-mcp/simd:v0.54.4
+    build: .
+    volumes:
+      - localnet-data:/data
+      - ./setup.sh:/setup.sh:ro
+    entrypoint: ["bash", "/setup.sh"]
+
+  sentry:
+    <<: *node
+    command: ["simd", "start", "--home", "/data/sentry/simd"]
+    networks: { localnet: { ipv4_address: 172.30.0.20 } }
+    ports: ["26657:26657", "26660:26660", "1317:1317"]
+
+  val0:
+    <<: *node
+    command: ["simd", "start", "--home", "/data/node0/simd"]
+    networks: { localnet: { ipv4_address: 172.30.0.10 } }
+    ports: ["26757:26657", "26760:26660"]
+
+  val1:
+    <<: *node
+    command: ["simd", "start", "--home", "/data/node1/simd"]
+    networks: { localnet: { ipv4_address: 172.30.0.11 } }
+    ports: ["26857:26657", "26860:26660"]
+
+  val2:
+    <<: *node
+    command: ["simd", "start", "--home", "/data/node2/simd"]
+    networks: { localnet: { ipv4_address: 172.30.0.12 } }
+    ports: ["26957:26657", "26960:26660"]
+
+  val3:
+    <<: *node
+    command: ["simd", "start", "--home", "/data/node3/simd"]
+    networks: { localnet: { ipv4_address: 172.30.0.13 } }
+    ports: ["27057:26657", "27060:26660"]
+
+networks:
+  localnet:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  localnet-data:
