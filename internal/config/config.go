@@ -37,8 +37,18 @@ type Node struct {
 	ValidatorHex string   `yaml:"-"` // parsed ValidatorAddress, upper-case hex
 }
 
+// Cosmos enables the Cosmos SDK layer (jail status, slashing margin,
+// upgrades). Chain state is the same on every node, so one REST endpoint —
+// a sentry or full node, never needing the validator's own API — suffices.
+type Cosmos struct {
+	REST string `yaml:"rest"`
+
+	RESTURL *url.URL `yaml:"-"`
+}
+
 type Config struct {
-	Nodes []Node `yaml:"nodes"`
+	Cosmos *Cosmos `yaml:"cosmos,omitempty"`
+	Nodes  []Node  `yaml:"nodes"`
 }
 
 // Node returns the node with the given name.
@@ -128,6 +138,12 @@ var nameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
 func (c *Config) validate() error {
 	if len(c.Nodes) == 0 {
 		return errors.New("config has no nodes")
+	}
+	if c.Cosmos != nil {
+		var err error
+		if c.Cosmos.RESTURL, err = parseURL(c.Cosmos.REST); err != nil {
+			return fmt.Errorf("cosmos.rest: %w", err)
+		}
 	}
 	seen := map[string]bool{}
 	for i := range c.Nodes {

@@ -15,14 +15,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
 
 // Endpoint is an allowlisted request path. Only this package can construct one.
 type Endpoint struct {
-	path   string
-	params []string // allowed query parameter names
+	path    string
+	params  []string       // allowed query parameter names
+	segment *regexp.Regexp // if set, one trailing path segment matching this is required
 }
 
 // Path returns the request path, e.g. "/status".
@@ -40,10 +42,27 @@ var (
 	Metrics         = Endpoint{path: "/metrics"}
 )
 
+// Cosmos SDK REST (gRPC-gateway) query endpoints.
+var (
+	bech32Segment = regexp.MustCompile(`^[a-z0-9]{1,90}$`)
+	page          = []string{"pagination.limit", "pagination.key"}
+
+	CosmosNodeInfo       = Endpoint{path: "/cosmos/base/tendermint/v1beta1/node_info"}
+	CosmosBech32Prefix   = Endpoint{path: "/cosmos/auth/v1beta1/bech32"}
+	CosmosSlashingParams = Endpoint{path: "/cosmos/slashing/v1beta1/params"}
+	CosmosSigningInfo    = Endpoint{path: "/cosmos/slashing/v1beta1/signing_infos/", segment: bech32Segment}
+	CosmosValidators     = Endpoint{path: "/cosmos/staking/v1beta1/validators", params: page}
+	CosmosUpgradePlan    = Endpoint{path: "/cosmos/upgrade/v1beta1/current_plan"}
+	CosmosProposals      = Endpoint{path: "/cosmos/gov/v1/proposals", params: append([]string{"proposal_status"}, page...)}
+)
+
 var allowlist = map[string]Endpoint{}
 
 func init() {
-	for _, e := range []Endpoint{CometHealth, CometStatus, CometNetInfo, CometABCIInfo, CometValidators, CometCommit, Metrics} {
+	for _, e := range []Endpoint{
+		CometHealth, CometStatus, CometNetInfo, CometABCIInfo, CometValidators, CometCommit, Metrics,
+		CosmosNodeInfo, CosmosBech32Prefix, CosmosSlashingParams, CosmosSigningInfo, CosmosValidators, CosmosUpgradePlan, CosmosProposals,
+	} {
 		allowlist[e.path] = e
 	}
 }
@@ -51,7 +70,7 @@ func init() {
 // deniedPrefixes are paths that mutate state or the node's p2p layer. None of
 // them is in the allowlist; this is a second, explicit line of defense that a
 // future allowlist edit cannot silently undo.
-var deniedPrefixes = []string{"/broadcast_", "/unsafe_", "/dial_", "/check_tx"}
+var deniedPrefixes = []string{"/broadcast_", "/unsafe_", "/dial_", "/check_tx", "/cosmos/tx/"}
 
 // Error codes. Error messages never carry the node URL or the raw transport
 // error, because both can contain internal addresses.
@@ -119,12 +138,18 @@ func New(opts Options) *Client {
 
 // Get fetches endpoint e relative to base with the given query parameters.
 func (c *Client) Get(ctx context.Context, base *url.URL, e Endpoint, query url.Values) ([]byte, error) {
-	if err := check(e, query); err != nil {
+	return c.GetSegment(ctx, base, e, "", query)
+}
+
+// GetSegment is Get for endpoints that take one path parameter, such as a
+// consensus address. The segment must match the endpoint's pattern.
+func (c *Client) GetSegment(ctx context.Context, base *url.URL, e Endpoint, segment string, query url.Values) ([]byte, error) {
+	if err := check(e, segment, query); err != nil {
 		return nil, err
 	}
 
 	u := *base
-	u.Path = strings.TrimSuffix(base.Path, "/") + e.path
+	u.Path = strings.TrimSuffix(base.Path, "/") + e.path + segment
 	u.RawPath = ""
 	u.RawQuery = query.Encode()
 	u.Fragment = ""
@@ -163,7 +188,7 @@ func (c *Client) Get(ctx context.Context, base *url.URL, e Endpoint, query url.V
 	return body, nil
 }
 
-func check(e Endpoint, query url.Values) error {
+func check(e Endpoint, segment string, query url.Values) error {
 	for _, p := range deniedPrefixes {
 		if strings.HasPrefix(e.path, p) {
 			return &Error{Code: CodeNotAllowed, Detail: e.path}
@@ -172,6 +197,12 @@ func check(e Endpoint, query url.Values) error {
 	allowed, ok := allowlist[e.path]
 	if !ok {
 		return &Error{Code: CodeNotAllowed, Detail: e.path}
+	}
+	switch {
+	case allowed.segment == nil && segment != "":
+		return &Error{Code: CodeNotAllowed, Detail: e.path + " takes no path parameter"}
+	case allowed.segment != nil && !allowed.segment.MatchString(segment):
+		return &Error{Code: CodeNotAllowed, Detail: "invalid path parameter for " + e.path}
 	}
 	for k := range query {
 		if !contains(allowed.params, k) {

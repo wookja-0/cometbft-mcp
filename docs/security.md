@@ -7,9 +7,10 @@ cometbft-mcp sits between an LLM and production validator infrastructure. The de
 | Threat | Control | Where |
 |---|---|---|
 | Validator key theft, double-signing | No config field for key paths; secret-looking fields rejected by name; no filesystem reads besides the config | `internal/config` |
-| Agent changes node or chain state | One HTTP client; `GET` only; hard-coded path allowlist that code outside the package cannot extend; `broadcast_*`, `unsafe_*`, `dial_*`, `check_tx` denied even if added to the allowlist; per-endpoint query-parameter allowlist; no redirects | `internal/safehttp` |
+| Agent changes node or chain state | One HTTP client; `GET` only; hard-coded path allowlist (CometBFT reads, Cosmos SDK slashing/staking/upgrade/gov queries) that code outside the package cannot extend; `broadcast_*`, `unsafe_*`, `dial_*`, `check_tx`, `/cosmos/tx/` denied even if added to the allowlist; per-endpoint query-parameter allowlist; path parameters (consensus addresses) must match `^[a-z0-9]{1,90}$`, so no traversal or injection; no redirects | `internal/safehttp` |
 | Validator IP exposed to the LLM provider | Peer IPs reduced to an address class, node IDs truncated, listen addresses masked, transport errors (which name the address) replaced by codes; opt-out only via `--reveal-network` | `internal/sanitize`, `internal/fleet` |
-| Prompt injection through monikers, versions, app names | Wrapped in `<untrusted>…</untrusted>`; embedded envelope tags neutralized; control and format characters removed; truncated to 128 runes | `internal/sanitize` |
+| REST endpoint on the wrong chain | The REST node's chain ID is checked against the nodes' before any slashing or upgrade judgment (`rest_wrong_chain`) | `internal/fleet` |
+| Prompt injection through monikers, versions, app names, upgrade plans, proposal titles | Wrapped in `<untrusted>…</untrusted>`; embedded envelope tags neutralized; control and format characters removed; truncated to 128 runes | `internal/sanitize` |
 | Load on production nodes | Global in-flight cap (4); bounded scans (≤ 500 blocks); commits read from sentries/full nodes first; response size cap (8 MiB); per-request timeout | `internal/safehttp`, `internal/fleet` |
 | Exposed RPC ports | Docs steer to localhost, SSH tunnels or private networks; nothing in the server needs a public port | README |
 

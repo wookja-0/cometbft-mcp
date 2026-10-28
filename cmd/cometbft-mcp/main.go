@@ -77,6 +77,6 @@ func run(args []string) error {
 		Instructions: tools.Instructions(cfg),
 		Logger:       logger,
 	})
-	tools.Register(s, f)
+	tools.Register(s, f, cfg)
 	return s.Run(ctx, &mcp.StdioTransport{})
 }

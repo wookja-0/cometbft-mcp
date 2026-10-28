@@ -17,11 +17,13 @@ import (
 	"github.com/wookja-0/cometbft-mcp/internal/safehttp"
 	"github.com/wookja-0/cometbft-mcp/internal/sanitize"
 	"github.com/wookja-0/cometbft-mcp/internal/source/comet"
+	"github.com/wookja-0/cometbft-mcp/internal/source/cosmos"
 )
 
 type Fleet struct {
 	cfg        *config.Config
 	clients    map[string]*comet.Client
+	cosmos     *cosmos.Client // nil unless cosmos.rest is configured
 	net        sanitize.Network
 	thresholds analysis.Thresholds
 	now        func() time.Time
@@ -50,6 +52,9 @@ func New(cfg *config.Config, h *safehttp.Client, opts Options) *Fleet {
 	for _, n := range cfg.Nodes {
 		f.clients[n.Name] = comet.NewClient(h, n.RPCURL)
 	}
+	if cfg.Cosmos != nil {
+		f.cosmos = cosmos.NewClient(h, cfg.Cosmos.RESTURL)
+	}
 	return f
 }
 
@@ -71,6 +76,10 @@ func (f *Fleet) nodeError(err error) *NodeError {
 	var ce *comet.Error
 	if errors.As(err, &ce) {
 		return &NodeError{Code: ce.Code, Detail: ce.Detail}
+	}
+	var xe *cosmos.Error
+	if errors.As(err, &xe) {
+		return &NodeError{Code: xe.Code, Detail: xe.Detail}
 	}
 	return &NodeError{Code: "internal_error", Detail: err.Error()}
 }

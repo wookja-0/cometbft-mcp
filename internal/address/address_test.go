@@ -2,24 +2,8 @@ package address
 
 import (
 	"encoding/hex"
-	"strings"
 	"testing"
 )
-
-// encodeBech32 is the inverse of decodeBech32, used to build test vectors.
-func encodeBech32(hrp string, data []byte) string {
-	values, _ := convertBits(data, 8, 5, true)
-	pm := polymod(append(append(expandHRP(hrp), values...), 0, 0, 0, 0, 0, 0)) ^ 1
-	var b strings.Builder
-	b.WriteString(hrp + "1")
-	for _, v := range values {
-		b.WriteByte(charset[v])
-	}
-	for i := range 6 {
-		b.WriteByte(charset[(pm>>uint(5*(5-i)))&31])
-	}
-	return b.String()
-}
 
 func TestBIP173ValidChecksums(t *testing.T) {
 	for _, s := range []string{
@@ -59,7 +43,8 @@ func TestParseConsensusHex(t *testing.T) {
 func TestParseConsensusBech32RoundTrip(t *testing.T) {
 	raw, _ := hex.DecodeString("A1B2C3D4E5F60718293A4B5C6D7E8F9012345678")
 	for _, hrp := range []string{"cosmosvalcons", "osmovalcons"} {
-		got, err := ParseConsensus(encodeBech32(hrp, raw))
+		enc, _ := EncodeBech32(hrp, raw)
+		got, err := ParseConsensus(enc)
 		if err != nil || got != "A1B2C3D4E5F60718293A4B5C6D7E8F9012345678" {
 			t.Fatalf("%s: got %q, %v", hrp, got, err)
 		}
@@ -77,8 +62,35 @@ func TestParseConsensusMatchesCometBFT(t *testing.T) {
 func TestParseConsensusRejectsOtherPrefixes(t *testing.T) {
 	raw := make([]byte, 20)
 	for _, hrp := range []string{"cosmos", "cosmosvaloper", "cosmosvalconspub"} {
-		if _, err := ParseConsensus(encodeBech32(hrp, raw)); err == nil {
+		enc, _ := EncodeBech32(hrp, raw)
+		if _, err := ParseConsensus(enc); err == nil {
 			t.Errorf("%s: expected error", hrp)
 		}
 	}
+}
+
+func TestConsensusFromPubKey(t *testing.T) {
+	// Public key / address pair from CometBFT's internal/test/config.go.
+	got, err := ConsensusFromPubKey("/cosmos.crypto.ed25519.PubKey", "AT/+aaL1eB0477Mud9JMm8Sh8BIvOYlPGC9KkIUmFaE=")
+	if err != nil || got != "A3258DCBF45DCA0DF052981870F2D1441A36D145" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if _, err := ConsensusFromPubKey("/cosmos.crypto.secp256k1.PubKey", "AAAA"); err == nil {
+		t.Fatal("expected unsupported key type")
+	}
+}
+
+func TestEncodeValcons(t *testing.T) {
+	got, err := EncodeBech32("cosmosvalcons", mustHex("89A28424AF509FE12A7EDF335CCE521F05C8C154"))
+	if err != nil || got != "cosmosvalcons13x3ggf902z07z2n7mue4enjjruzu3s25368anl" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+}
+
+func mustHex(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }

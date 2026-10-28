@@ -4,13 +4,15 @@
 //
 //	make localnet-up && make e2e
 //
-// TestValidatorDowntime stops and restarts a validator container; it takes
-// about a minute.
+// The tests change chain state: they stop and restart validators, get val2
+// jailed and unjailed, and pass an upgrade proposal for a far-future height.
+// Reset with `make localnet-down && make localnet-up`. Takes ~4 minutes.
 package e2e
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,6 +65,62 @@ func call(t *testing.T, s *mcp.ClientSession, tool string, args map[string]any) 
 	return out
 }
 
+// poll calls tool until done returns true or the timeout passes.
+func poll(t *testing.T, s *mcp.ClientSession, timeout time.Duration, tool string, args map[string]any, done func(map[string]any) bool) map[string]any {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		r := call(t, s, tool, args)
+		if done(r) {
+			return r
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s: condition not met within %s; last: %v", tool, timeout, r["summary"])
+		}
+		time.Sleep(3 * time.Second)
+	}
+}
+
+func compose(t *testing.T, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("docker", append([]string{"compose", "-f", filepath.Join(repoRoot(), "localnet", "docker-compose.yml")}, args...)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("docker compose %v: %v\n%s", args, err, out)
+	}
+	return string(out)
+}
+
+// simdTx signs and broadcasts a transaction inside a validator's container
+// with its test keyring. This is test tooling: cometbft-mcp itself cannot sign.
+func simdTx(t *testing.T, node int, args ...string) {
+	t.Helper()
+	home := fmt.Sprintf("/data/node%d/simd", node)
+	full := append([]string{"exec", "-T", fmt.Sprintf("val%d", node), "simd", "tx"}, args...)
+	full = append(full, "--from", fmt.Sprintf("node%d", node), "--keyring-backend", "test", "--home", home,
+		"--chain-id", "localnet-1", "--gas", "400000", "--yes", "--output", "json")
+	out := compose(t, full...)
+	var res struct {
+		Code   int    `json:"code"`
+		RawLog string `json:"raw_log"`
+	}
+	if err := json.Unmarshal([]byte(out[strings.Index(out, "{"):]), &res); err != nil || res.Code != 0 {
+		t.Fatalf("tx %v: code %d %s (%v)\n%s", args, res.Code, res.RawLog, err, out)
+	}
+}
+
+func cosmosOf(t *testing.T, r map[string]any) map[string]any {
+	t.Helper()
+	c, ok := r["cosmos"].(map[string]any)
+	if !ok {
+		t.Fatalf("no cosmos section: %v", r)
+	}
+	if e, ok := c["error"]; ok {
+		t.Fatalf("cosmos error: %v", e)
+	}
+	return c
+}
+
 func TestToolsAreReadOnly(t *testing.T) {
 	s := connect(t)
 	res, err := s.ListTools(context.Background(), nil)
@@ -76,7 +134,7 @@ func TestToolsAreReadOnly(t *testing.T) {
 			t.Errorf("%s is not annotated read-only", tool.Name)
 		}
 	}
-	if strings.Join(names, ",") != "node_status,peer_health,validator_health" {
+	if strings.Join(names, ",") != "fleet_overview,node_status,peer_health,upgrade_readiness,validator_health" {
 		t.Fatalf("tools = %v", names)
 	}
 }
@@ -84,9 +142,10 @@ func TestToolsAreReadOnly(t *testing.T) {
 func TestHealthyLocalnet(t *testing.T) {
 	s := connect(t)
 
-	st := call(t, s, "node_status", nil)
-	if st["level"] != "ok" || !strings.HasPrefix(st["summary"].(string), "5 nodes: 5 ok") {
-		t.Fatalf("node_status: %v", st["summary"])
+	ov := call(t, s, "fleet_overview", nil)
+	t.Logf("fleet_overview: %s", ov["summary"])
+	if ov["level"] == "critical" || len(ov["validators"].([]any)) != 4 {
+		t.Fatalf("fleet_overview: %v", ov["summary"])
 	}
 
 	pe := call(t, s, "peer_health", map[string]any{"node": "val0"})
@@ -95,39 +154,91 @@ func TestHealthyLocalnet(t *testing.T) {
 		t.Fatalf("val0 should have exactly the sentry as a private peer: %v", val0)
 	}
 
-	// Earlier downtime tests can leave misses in the window, so check that
-	// every validator is signing now rather than that the window is clean.
 	for _, v := range []string{"val0", "val1", "val2", "val3"} {
 		r := call(t, s, "validator_health", map[string]any{"node": v, "window": 50})
-		in := r["active_set"].(map[string]any)
-		if r["miss_streak"].(float64) != 0 || r["level"] == "critical" || in["in_set"] != true || r["source_node"] != "sentry" {
+		c := cosmosOf(t, r)
+		if r["miss_streak"].(float64) != 0 || r["level"] == "critical" || r["source_node"] != "sentry" {
 			t.Fatalf("%s: %v", v, r["summary"])
 		}
+		// Staking lookup matched the validator by its consensus key.
+		if c["jailed"] != false || c["status"] != "BOND_STATUS_BONDED" || !strings.HasPrefix(c["operator_address"].(string), "cosmosvaloper1") {
+			t.Fatalf("%s cosmos: %v", v, c)
+		}
+		if c["max_missed"].(float64) != 25 || c["misses_until_jail"].(float64) != 25-c["missed_in_window"].(float64) {
+			t.Fatalf("%s slashing margin: %v", v, c)
+		}
+	}
+}
+
+func TestUpgradeReadiness(t *testing.T) {
+	s := connect(t)
+	before := call(t, s, "upgrade_readiness", nil)
+	if before["plan"] != nil {
+		t.Skipf("a plan is already scheduled (%v); reset the localnet to rerun", before["summary"])
+	}
+
+	proposal := `{
+  "messages": [{
+    "@type": "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade",
+    "authority": "cosmos10d07y265gmmuvt4z0w9aw880jnsr700j6zn9kn",
+    "plan": {"name": "v2-e2e", "height": "10000000", "info": ""}
+  }],
+  "deposit": "10000000stake",
+  "title": "Upgrade to v2-e2e",
+  "summary": "e2e test upgrade"
+}`
+	compose(t, "exec", "-T", "val0", "sh", "-c", "cat > /tmp/proposal.json <<'EOF'\n"+proposal+"\nEOF")
+	simdTx(t, 0, "gov", "submit-proposal", "/tmp/proposal.json")
+
+	r := poll(t, s, 30*time.Second, "upgrade_readiness", nil, func(r map[string]any) bool {
+		return len(r["upgrade_proposals_in_voting"].([]any)) > 0
+	})
+	p := r["upgrade_proposals_in_voting"].([]any)[0].(map[string]any)
+	t.Logf("in voting: %s", r["summary"])
+	if p["upgrade_name"] != "<untrusted>v2-e2e</untrusted>" || p["upgrade_height"].(float64) != 10000000 {
+		t.Fatalf("proposal = %v", p)
+	}
+
+	for i := range 4 {
+		simdTx(t, i, "gov", "vote", fmt.Sprint(p["id"]), "yes")
+	}
+	r = poll(t, s, 90*time.Second, "upgrade_readiness", nil, func(r map[string]any) bool { return r["plan"] != nil })
+	t.Logf("scheduled: %s", r["summary"])
+	plan := r["plan"].(map[string]any)
+	if plan["name"] != "<untrusted>v2-e2e</untrusted>" || plan["height"].(float64) != 10000000 || plan["eta"] == nil || r["avg_block_seconds"].(float64) <= 0 {
+		t.Fatalf("plan = %v", plan)
+	}
+	if len(r["nodes"].([]any)) != 5 {
+		t.Fatalf("nodes = %v", r["nodes"])
 	}
 }
 
 func TestValidatorDowntime(t *testing.T) {
 	s := connect(t)
-	compose := func(args ...string) {
-		cmd := exec.Command("docker", append([]string{"compose", "-f", filepath.Join(repoRoot(), "localnet", "docker-compose.yml")}, args...)...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("docker compose %v: %v\n%s", args, err, out)
-		}
-	}
-
-	compose("stop", "val3")
+	compose(t, "stop", "val3")
 	stopped := true
 	t.Cleanup(func() {
 		if stopped {
-			compose("start", "val3")
+			compose(t, "start", "val3")
 		}
 	})
-	time.Sleep(15 * time.Second) // 3 of 4 validators keep the chain going (> 2/3 power)
+	// 3 of 4 validators keep the chain going (> 2/3 power); wait for ≥ 3 misses.
+	time.Sleep(15 * time.Second)
 
 	r := call(t, s, "validator_health", map[string]any{"node": "val3", "window": 30})
 	t.Logf("val3 down: %s", r["summary"])
+	c := cosmosOf(t, r)
 	if r["level"] != "critical" || r["miss_streak"].(float64) < 3 || r["source_node"] != "sentry" {
 		t.Fatalf("val3 down: %v", r)
+	}
+	// On a fresh chain the validator is still in its first signing window,
+	// where x/slashing cannot jail it yet; the estimate only applies after.
+	if _, grace := c["grace_until_height"]; grace {
+		if c["time_to_jail"] != nil {
+			t.Fatalf("time_to_jail during the grace window: %v", c)
+		}
+	} else if c["time_to_jail"] == nil || c["misses_until_jail"].(float64) >= 25 {
+		t.Fatalf("val3 jail estimate: %v", c)
 	}
 
 	st := call(t, s, "node_status", map[string]any{"node": "val3"})
@@ -139,18 +250,60 @@ func TestValidatorDowntime(t *testing.T) {
 		t.Fatalf("summary leaks the RPC address: %s", st["summary"])
 	}
 
-	compose("start", "val3")
+	compose(t, "start", "val3")
 	stopped = false
-	deadline := time.Now().Add(90 * time.Second)
-	for {
-		r = call(t, s, "validator_health", map[string]any{"node": "val3", "window": 30})
-		if r["miss_streak"].(float64) == 0 && r["level"] != "critical" {
-			t.Logf("val3 recovered: %s", r["summary"])
-			break
+	r = poll(t, s, 90*time.Second, "validator_health", map[string]any{"node": "val3", "window": 30}, func(r map[string]any) bool {
+		return r["miss_streak"].(float64) == 0 && r["level"] != "critical"
+	})
+	t.Logf("val3 recovered: %s", r["summary"])
+}
+
+func TestJailAndUnjail(t *testing.T) {
+	s := connect(t)
+	args := map[string]any{"node": "val2", "window": 30}
+
+	compose(t, "stop", "val2")
+	stopped := true
+	t.Cleanup(func() {
+		if stopped {
+			compose(t, "start", "val2")
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("val3 did not recover: %s", r["summary"])
-		}
-		time.Sleep(3 * time.Second)
+	})
+
+	// > 25 misses in the 50-block window jails it.
+	r := poll(t, s, 2*time.Minute, "validator_health", args, func(r map[string]any) bool {
+		return cosmosOf(t, r)["jailed"] == true
+	})
+	t.Logf("val2 jailed: %s", r["summary"])
+	c := cosmosOf(t, r)
+	if c["jailed_until"] == nil || c["status"] == "BOND_STATUS_BONDED" || !strings.HasSuffix(r["summary"].(string), "; JAILED") {
+		t.Fatalf("jailed view: %v", c)
 	}
+	ov := call(t, s, "fleet_overview", nil)
+	if ov["level"] != "critical" || !strings.Contains(ov["summary"].(string), "val2") {
+		t.Fatalf("overview: %s", ov["summary"])
+	}
+
+	compose(t, "start", "val2")
+	stopped = false
+	until, _ := time.Parse(time.RFC3339, c["jailed_until"].(string))
+	time.Sleep(time.Until(until) + 5*time.Second)
+	// Wait for the restarted node to catch up so it can sign once unjailed.
+	// (It reports no_voting_power while jailed; that is expected.)
+	poll(t, s, time.Minute, "node_status", map[string]any{"node": "val2"}, func(r map[string]any) bool {
+		n := r["nodes"].([]any)[0].(map[string]any)
+		behind, ok := n["behind_fleet_blocks"].(float64)
+		return n["error"] == nil && n["catching_up"] == false && ok && behind < 5
+	})
+	simdTx(t, 2, "slashing", "unjail")
+
+	r = poll(t, s, time.Minute, "validator_health", args, func(r map[string]any) bool {
+		c := cosmosOf(t, r)
+		in, _ := r["active_set"].(map[string]any)
+		// Unjailing takes effect in the validator set two blocks later; wait
+		// until it is back in the set and signing.
+		return c["jailed"] == false && c["status"] == "BOND_STATUS_BONDED" &&
+			in != nil && in["in_set"] == true && r["miss_streak"].(float64) == 0 && r["last_signed_height"] != nil
+	})
+	t.Logf("val2 unjailed: %s", r["summary"])
 }

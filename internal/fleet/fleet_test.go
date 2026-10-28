@@ -35,6 +35,7 @@ type fakeChain struct {
 	// flag returns the block_id_flag for addr at height h.
 	flag  func(h int64, addr string) int
 	nodes map[string]*fakeNode
+	rest  *fakeREST // served under /rest/ when set
 }
 
 type fakeNode struct {
@@ -55,6 +56,10 @@ type fakePeer struct {
 func (fc *fakeChain) serve(t *testing.T) *httptest.Server {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/"), "/", 2)
+		if parts[0] == "rest" && fc.rest != nil {
+			fc.rest.serve(w, "/"+parts[1])
+			return
+		}
 		n, ok := fc.nodes[parts[0]]
 		if !ok || len(parts) < 2 || n.down {
 			w.WriteHeader(http.StatusBadGateway)
@@ -120,7 +125,11 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 			sigs = append(sigs, map[string]any{"block_id_flag": flag, "validator_address": addr})
 		}
 		return map[string]any{"signed_header": map[string]any{
-			"header": map[string]any{"height": strconv.FormatInt(ch, 10), "validators_hash": strings.Join(set, "")[:16] + strconv.Itoa(len(set))},
+			"header": map[string]any{
+				"height":          strconv.FormatInt(ch, 10),
+				"time":            now.Add(-time.Duration(fc.height-ch+1) * time.Second), // 1s blocks
+				"validators_hash": strings.Join(set, "")[:16] + strconv.Itoa(len(set)),
+			},
 			"commit": map[string]any{"height": strconv.FormatInt(ch, 10), "signatures": sigs},
 		}}, ""
 	case "/validators":
@@ -141,6 +150,9 @@ func newFleet(t *testing.T, fc *fakeChain, nodes []config.Node, reveal bool) *Fl
 	t.Helper()
 	srv := fc.serve(t)
 	var yaml strings.Builder
+	if fc.rest != nil {
+		fmt.Fprintf(&yaml, "cosmos:\n  rest: %s/rest/\n", srv.URL)
+	}
 	yaml.WriteString("nodes:\n")
 	for _, n := range nodes {
 		fmt.Fprintf(&yaml, "  - name: %s\n    role: %s\n    rpc: %s/%s/\n", n.Name, n.Role, srv.URL, n.Name)
@@ -443,7 +455,8 @@ func TestReportsNeverLeakNetworkDetailsWhenMasked(t *testing.T) {
 	st, _ := f.Status(ctx, "")
 	pe, _ := f.Peers(ctx, "")
 	va, _ := f.Validator(ctx, "val-a", 10)
-	out, _ := json.Marshal([]any{st, pe, va})
+	ov, _ := f.Overview(ctx)
+	out, _ := json.Marshal([]any{st, pe, va, ov})
 	s := string(out)
 
 	for _, leak := range []string{"34.1.2.3", "10.9.8.7", "abcdef0123456789", "fedcba9876543210", "127.0.0.1"} {

@@ -21,6 +21,7 @@ e2e:
 
 localnet-up:
 	$(COMPOSE) up -d --build
+	localnet/gen-config.sh
 
 localnet-down:
 	$(COMPOSE) down -v

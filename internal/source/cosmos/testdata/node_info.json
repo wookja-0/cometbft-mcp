@@ -1,0 +1,13 @@
+{
+  "default_node_info": {
+    "network": "localnet-1",
+    "moniker": "sentry",
+    "version": "0.39.4"
+  },
+  "application_version": {
+    "name": "",
+    "app_name": "<appd>",
+    "version": "",
+    "cosmos_sdk_version": "v0.54.0"
+  }
+}

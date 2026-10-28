@@ -1,0 +1,70 @@
+{
+  "validators": [
+    {
+      "operator_address": "cosmosvaloper1994dlxxqfwwzlk4keycgpzpfqv2d6vlau8g958",
+      "consensus_pubkey": {
+        "@type": "/cosmos.crypto.ed25519.PubKey",
+        "key": "MX9Es/3Fhc6dbppHOcZXcN6vVoT4glnKsAxjXiyDvEc="
+      },
+      "jailed": false,
+      "status": "BOND_STATUS_BONDED",
+      "tokens": "100000000",
+      "delegator_shares": "100000000.000000000000000000",
+      "description": {
+        "moniker": "node3",
+        "identity": "",
+        "website": "",
+        "security_contact": "",
+        "details": ""
+      },
+      "unbonding_height": "0",
+      "unbonding_time": "1970-01-01T00:00:00Z",
+      "commission": {
+        "commission_rates": {
+          "rate": "1.000000000000000000",
+          "max_rate": "1.000000000000000000",
+          "max_change_rate": "1.000000000000000000"
+        },
+        "update_time": "2026-10-28T06:36:37.483063548Z"
+      },
+      "min_self_delegation": "1",
+      "unbonding_on_hold_ref_count": "0",
+      "unbonding_ids": []
+    },
+    {
+      "operator_address": "cosmosvaloper1c3ql8vujh0rawpwmerq8a9rsgj4g8av8ypgfjs",
+      "consensus_pubkey": {
+        "@type": "/cosmos.crypto.ed25519.PubKey",
+        "key": "pi0PACC+SsviB5v9Rwll9Pp9u0+HE/P1WzmDyK3m8ro="
+      },
+      "jailed": false,
+      "status": "BOND_STATUS_BONDED",
+      "tokens": "100000000",
+      "delegator_shares": "100000000.000000000000000000",
+      "description": {
+        "moniker": "node0",
+        "identity": "",
+        "website": "",
+        "security_contact": "",
+        "details": ""
+      },
+      "unbonding_height": "0",
+      "unbonding_time": "1970-01-01T00:00:00Z",
+      "commission": {
+        "commission_rates": {
+          "rate": "1.000000000000000000",
+          "max_rate": "1.000000000000000000",
+          "max_change_rate": "1.000000000000000000"
+        },
+        "update_time": "2026-10-28T06:36:37.483063548Z"
+      },
+      "min_self_delegation": "1",
+      "unbonding_on_hold_ref_count": "0",
+      "unbonding_ids": []
+    }
+  ],
+  "pagination": {
+    "next_key": "FMlVVBKt4K1OIoQ+j9ro7L4s86qP",
+    "total": "0"
+  }
+}

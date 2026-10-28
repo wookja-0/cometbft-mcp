@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wookja-0/cometbft-mcp/internal/safehttp"
+	"github.com/wookja-0/cometbft-mcp/internal/source/jsonnum"
 )
 
 // Error codes for failures past the transport layer.
@@ -31,21 +32,7 @@ type Error struct {
 func (e *Error) Error() string { return e.Code + ": " + e.Detail }
 
 // Int64 decodes CometBFT's int64 fields, which are JSON strings.
-type Int64 int64
-
-func (i *Int64) UnmarshalJSON(b []byte) error {
-	s := strings.Trim(string(b), `"`)
-	if s == "" || s == "null" {
-		*i = 0
-		return nil
-	}
-	v, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return err
-	}
-	*i = Int64(v)
-	return nil
-}
+type Int64 = jsonnum.Int64
 
 // BlockIDFlag values in a commit signature.
 const (
