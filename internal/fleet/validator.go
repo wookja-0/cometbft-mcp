@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/wookja-0/cometbft-mcp/internal/analysis"
 	"github.com/wookja-0/cometbft-mcp/internal/config"
@@ -27,17 +28,19 @@ type ValidatorReport struct {
 	AddressSource string `json:"address_source"` // "config" or "node"
 	SourceNode    string `json:"source_node"`    // node the commits were read from
 
-	Window           Window     `json:"window"`
-	Signed           int        `json:"signed"`
-	NilVotes         int        `json:"nil_votes"`
-	Missed           int        `json:"missed"`
-	NotInSet         int        `json:"not_in_set"`
-	Unreadable       int        `json:"unreadable"`
-	MissedPct        float64    `json:"missed_pct"`
-	MissStreak       int        `json:"miss_streak"`
-	LastSignedHeight int64      `json:"last_signed_height,omitempty"`
-	ActiveSet        *ActiveSet `json:"active_set,omitempty"`
-	Note             string     `json:"note"`
+	Window           Window           `json:"window"`
+	Signed           int              `json:"signed"`
+	NilVotes         int              `json:"nil_votes"`
+	Missed           int              `json:"missed"`
+	NotInSet         int              `json:"not_in_set"`
+	Unreadable       int              `json:"unreadable"`
+	MissedPct        float64          `json:"missed_pct"`
+	MissStreak       int              `json:"miss_streak"`
+	LastSignedHeight int64            `json:"last_signed_height,omitempty"`
+	ActiveSet        *ActiveSet       `json:"active_set,omitempty"`
+	AvgBlockSeconds  float64          `json:"avg_block_seconds,omitempty"`
+	Cosmos           *CosmosValidator `json:"cosmos,omitempty"`
+	Note             string           `json:"note"`
 }
 
 type Window struct {
@@ -54,8 +57,12 @@ type ActiveSet struct {
 	SetSize       int     `json:"set_size"`
 }
 
-const validatorNote = "Liveness is computed from commit signatures and works on any CometBFT chain. " +
-	"Jail status and the exact margin to the chain's downtime-slashing threshold need the Cosmos SDK layer, which is not configured."
+const (
+	validatorNote = "Liveness is computed from commit signatures and works on any CometBFT chain. " +
+		"Jail status and the exact margin to the chain's downtime-slashing threshold need the Cosmos SDK layer: set cosmos.rest in the config."
+	validatorNoteCosmos = "Liveness is computed from commit signatures; jail status and the slashing margin come from the chain's x/slashing and x/staking state (cosmos section). " +
+		"missed_in_window is the chain's own counter over its signing window, which can differ in length from the liveness window above."
+)
 
 // Validator reports signing liveness for a validator node over the last
 // `window` blocks. Commits are read from a healthy non-validator node when
@@ -76,10 +83,11 @@ func (f *Fleet) Validator(ctx context.Context, name string, window int) (*Valida
 		addr, addrSource = strings.ToUpper(s.ValidatorInfo.Address), "node"
 	}
 
-	src, latest, earliest, err := f.pickSource(ctx, target.Name)
+	src, st, err := f.pickSource(ctx, target.Name)
 	if err != nil {
 		return nil, err
 	}
+	latest, earliest := int64(st.SyncInfo.LatestBlockHeight), int64(st.SyncInfo.EarliestBlockHeight)
 
 	// The commit at the latest height is the node's "seen commit": it holds
 	// only the precommits that arrived before +2/3, so a slower (e.g.
@@ -98,6 +106,7 @@ func (f *Fleet) Validator(ctx context.Context, name string, window int) (*Valida
 	scan := newScanner(src, addr)
 	statuses := scan.run(ctx, heights)
 	l := analysis.Summarize(heights, statuses)
+	blockTime := scan.blockTime()
 
 	r := &ValidatorReport{
 		Validator:        target.Name,
@@ -121,6 +130,15 @@ func (f *Fleet) Validator(ctx context.Context, name string, window int) (*Valida
 	}
 	if set, err := scan.validatorsAt(ctx, latest); err == nil {
 		r.ActiveSet = activeSet(set, addr)
+	}
+	if blockTime > 0 {
+		r.AvgBlockSeconds = roundTo(blockTime.Seconds(), 2)
+	}
+	if f.cosmos != nil {
+		cv, fs := f.cosmosValidator(ctx, addr, st.NodeInfo.Network, latest, l.MissStreak, blockTime)
+		r.Cosmos = cv
+		r.Findings = append(r.Findings, fs...)
+		r.Note = validatorNoteCosmos
 	}
 	r.Level = analysis.LevelOf(r.Findings)
 	r.Summary = validatorSummary(r)
@@ -159,9 +177,9 @@ type source struct {
 	client *comet.Client
 }
 
-// pickSource returns the first synced node, preferring sentries and full
-// nodes (to keep load off validators) and the target itself last.
-func (f *Fleet) pickSource(ctx context.Context, target string) (source, int64, int64, error) {
+// pickSource returns the first synced node and its status, preferring
+// sentries and full nodes (to keep load off validators) and target last.
+func (f *Fleet) pickSource(ctx context.Context, target string) (source, *comet.Status, error) {
 	var order []config.Node
 	for _, pass := range []func(config.Node) bool{
 		func(n config.Node) bool { return n.Role != config.RoleValidator },
@@ -186,9 +204,9 @@ func (f *Fleet) pickSource(ctx context.Context, target string) (source, int64, i
 			tried = append(tried, n.Name+": catching_up")
 			continue
 		}
-		return source{n.Name, c}, int64(s.SyncInfo.LatestBlockHeight), int64(s.SyncInfo.EarliestBlockHeight), nil
+		return source{n.Name, c}, s, nil
 	}
-	return source{}, 0, 0, fmt.Errorf("no synced node to read commits from (%s)", strings.Join(tried, "; "))
+	return source{}, nil, fmt.Errorf("no synced node to read commits from (%s)", strings.Join(tried, "; "))
 }
 
 // scanner classifies the validator's signature at each height. A commit
@@ -201,6 +219,8 @@ type scanner struct {
 
 	mu   sync.Mutex
 	sets map[string][]comet.Validator // by validators_hash
+
+	first, last *comet.Commit // earliest and latest readable commits, for block time
 }
 
 func newScanner(src source, addr string) *scanner {
@@ -226,8 +246,27 @@ func (s *scanner) run(ctx context.Context, heights []int64) []analysis.SigStatus
 	out := make([]analysis.SigStatus, len(heights))
 	for i, c := range commits {
 		out[i] = s.classify(ctx, c)
+		if c != nil {
+			if s.first == nil {
+				s.first = c
+			}
+			s.last = c
+		}
 	}
 	return out
+}
+
+// blockTime is the mean block interval over the scanned commits; 0 if unknown.
+func (s *scanner) blockTime() time.Duration {
+	if s.first == nil || s.last == nil {
+		return 0
+	}
+	blocks := int64(s.last.Header.Height - s.first.Header.Height)
+	span := s.last.Header.Time.Sub(s.first.Header.Time)
+	if blocks <= 0 || span <= 0 {
+		return 0
+	}
+	return span / time.Duration(blocks)
 }
 
 func (s *scanner) classify(ctx context.Context, c *comet.Commit) analysis.SigStatus {
@@ -317,6 +356,19 @@ func validatorSummary(r *ValidatorReport) string {
 	}
 	if r.ActiveSet != nil && !r.ActiveSet.InSet {
 		s += ", not in the current validator set"
+	}
+	if c := r.Cosmos; c != nil && c.Error == nil {
+		switch {
+		case c.Tombstoned:
+			s += "; TOMBSTONED"
+		case c.Jailed:
+			s += "; JAILED"
+		case c.MissesUntilJail != nil:
+			s += fmt.Sprintf("; %d more misses until downtime jail", *c.MissesUntilJail)
+			if c.TimeToJail != "" {
+				s += " (~" + c.TimeToJail + " at the current rate)"
+			}
+		}
 	}
 	return s
 }

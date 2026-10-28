@@ -6,6 +6,8 @@ import (
 )
 
 const valid = `
+cosmos:
+  rest: http://127.0.0.1:1317
 nodes:
   - name: val-1
     role: validator
@@ -31,6 +33,9 @@ func TestParseValid(t *testing.T) {
 	}
 	if v.RPCURL.Host != "127.0.0.1:26757" || v.MetricsURL == nil {
 		t.Fatalf("urls = %v %v", v.RPCURL, v.MetricsURL)
+	}
+	if c.Cosmos == nil || c.Cosmos.RESTURL.Host != "127.0.0.1:1317" {
+		t.Fatalf("cosmos = %+v", c.Cosmos)
 	}
 	s, _ := c.Node("sentry-1")
 	if s.RPCURL.Path != "/cosmos/" {
@@ -66,6 +71,7 @@ func TestValidation(t *testing.T) {
 		"query":                "nodes:\n  - {name: a, role: full, rpc: 'http://a:1/?x=1'}\n",
 		"address on sentry":    "nodes:\n  - {name: a, role: sentry, rpc: 'http://a:1', validator_address: 89A28424AF509FE12A7EDF335CCE521F05C8C154}\n",
 		"bad address":          "nodes:\n  - {name: a, role: validator, rpc: 'http://a:1', validator_address: cosmos1abc}\n",
+		"bad cosmos rest":      "cosmos: {rest: 'grpc://a:9090'}\nnodes:\n  - {name: a, role: full, rpc: 'http://a:1'}\n",
 		"operator not valcons": "nodes:\n  - {name: a, role: validator, rpc: 'http://a:1', validator_address: cosmosvaloper1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq}\n",
 	}
 	for name, in := range cases {

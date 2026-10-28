@@ -57,7 +57,7 @@ func TestDeniedPathsAreRejectedBeforeAnyRequest(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Options{})
-	for _, p := range []string{"/broadcast_tx_sync", "/broadcast_tx_commit", "/broadcast_evidence", "/unsafe_flush_mempool", "/dial_peers", "/dial_seeds", "/check_tx", "/abci_query", "/genesis"} {
+	for _, p := range []string{"/cosmos/tx/v1beta1/txs", "/broadcast_tx_sync", "/broadcast_tx_commit", "/broadcast_evidence", "/unsafe_flush_mempool", "/dial_peers", "/dial_seeds", "/check_tx", "/abci_query", "/genesis"} {
 		// Constructing an Endpoint by hand is only possible inside this
 		// package; it simulates a future allowlist mistake.
 		_, err := c.Get(context.Background(), mustURL(t, srv.URL), Endpoint{path: p}, nil)
@@ -192,5 +192,35 @@ func TestConcurrencyCap(t *testing.T) {
 	}
 	if peak.Load() > 2 {
 		t.Fatalf("peak in-flight = %d, want <= 2", peak.Load())
+	}
+}
+
+func TestPathSegmentIsValidated(t *testing.T) {
+	var got string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Path
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	c := New(Options{})
+
+	if _, err := c.GetSegment(context.Background(), mustURL(t, srv.URL), CosmosSigningInfo, "cosmosvalcons1abc", nil); err != nil {
+		t.Fatal(err)
+	}
+	if got != "/cosmos/slashing/v1beta1/signing_infos/cosmosvalcons1abc" {
+		t.Fatalf("path = %s", got)
+	}
+	got = ""
+	for _, seg := range []string{"", "../../tx/v1beta1/txs", "a/b", "abc?x=1", "ABC", "a%2Fb"} {
+		_, err := c.GetSegment(context.Background(), mustURL(t, srv.URL), CosmosSigningInfo, seg, nil)
+		if code := codeOf(t, err); code != CodeNotAllowed {
+			t.Errorf("%q: code = %s", seg, code)
+		}
+	}
+	if _, err := c.GetSegment(context.Background(), mustURL(t, srv.URL), CometStatus, "x", nil); codeOf(t, err) != CodeNotAllowed {
+		t.Error("segment on a fixed endpoint must be rejected")
+	}
+	if got != "" {
+		t.Fatalf("server was hit with %s", got)
 	}
 }

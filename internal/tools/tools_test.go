@@ -16,14 +16,20 @@ import (
 // instructions and of each tool description.
 const clientTextLimit = 2048
 
-func session(t *testing.T) (*mcp.ClientSession, *config.Config) {
+const nodesYAML = "nodes:\n  - {name: val-1, role: validator, rpc: 'http://127.0.0.1:1'}\n  - {name: sentry-1, role: sentry, rpc: 'http://127.0.0.1:1'}\n"
+
+func session(t *testing.T, withCosmos bool) (*mcp.ClientSession, *config.Config) {
 	t.Helper()
-	cfg, err := config.Parse([]byte("nodes:\n  - {name: val-1, role: validator, rpc: 'http://127.0.0.1:1'}\n  - {name: sentry-1, role: sentry, rpc: 'http://127.0.0.1:1'}\n"))
+	y := nodesYAML
+	if withCosmos {
+		y = "cosmos: {rest: 'http://127.0.0.1:1'}\n" + y
+	}
+	cfg, err := config.Parse([]byte(y))
 	if err != nil {
 		t.Fatal(err)
 	}
 	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "test"}, &mcp.ServerOptions{Instructions: Instructions(cfg)})
-	Register(s, fleet.New(cfg, safehttp.New(safehttp.Options{}), fleet.Options{}))
+	Register(s, fleet.New(cfg, safehttp.New(safehttp.Options{}), fleet.Options{}), cfg)
 
 	ct, st := mcp.NewInMemoryTransports()
 	if _, err := s.Connect(context.Background(), st, nil); err != nil {
@@ -37,14 +43,35 @@ func session(t *testing.T) (*mcp.ClientSession, *config.Config) {
 	return cs, cfg
 }
 
-func TestToolSurface(t *testing.T) {
-	cs, cfg := session(t)
+func toolNames(t *testing.T, cs *mcp.ClientSession) string {
+	t.Helper()
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Tools) != 3 {
-		t.Fatalf("tools = %d", len(res.Tools))
+	var names []string
+	for _, tool := range res.Tools {
+		names = append(names, tool.Name)
+	}
+	return strings.Join(names, ",")
+}
+
+func TestUpgradeToolOnlyWithCosmos(t *testing.T) {
+	without, _ := session(t, false)
+	if got := toolNames(t, without); got != "fleet_overview,node_status,peer_health,validator_health" {
+		t.Fatalf("without cosmos: %s", got)
+	}
+	with, _ := session(t, true)
+	if got := toolNames(t, with); got != "fleet_overview,node_status,peer_health,upgrade_readiness,validator_health" {
+		t.Fatalf("with cosmos: %s", got)
+	}
+}
+
+func TestToolSurface(t *testing.T) {
+	cs, cfg := session(t, true)
+	res, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, tool := range res.Tools {
 		if len(tool.Description) > clientTextLimit {
@@ -67,7 +94,7 @@ func TestToolSurface(t *testing.T) {
 }
 
 func TestUnreachableNodeIsAReportNotAnError(t *testing.T) {
-	cs, _ := session(t)
+	cs, _ := session(t, false)
 	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "node_status", Arguments: map[string]any{}})
 	if err != nil {
 		t.Fatal(err)
@@ -82,12 +109,56 @@ func TestUnreachableNodeIsAReportNotAnError(t *testing.T) {
 }
 
 func TestBadArgumentIsAToolError(t *testing.T) {
-	cs, _ := session(t)
+	cs, _ := session(t, false)
 	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "validator_health", Arguments: map[string]any{"node": "sentry-1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "not validator") {
 		t.Fatalf("result = %+v", res.Content)
+	}
+}
+
+func TestPrompts(t *testing.T) {
+	cs, _ := session(t, true)
+	ctx := context.Background()
+	list, err := cs.ListPrompts(ctx, nil)
+	if err != nil || len(list.Prompts) != 2 {
+		t.Fatalf("prompts = %+v, %v", list, err)
+	}
+
+	daily, err := cs.GetPrompt(ctx, &mcp.GetPromptParams{Name: "daily_check"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := daily.Messages[0].Content.(*mcp.TextContent).Text
+	if !strings.Contains(text, "fleet_overview") || !strings.Contains(text, "upgrade_readiness") {
+		t.Fatalf("daily_check = %s", text)
+	}
+
+	triage, err := cs.GetPrompt(ctx, &mcp.GetPromptParams{Name: "incident_triage", Arguments: map[string]string{"node": "val-1", "symptom": "missed blocks alert"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text = triage.Messages[0].Content.(*mcp.TextContent).Text
+	for _, want := range []string{`"val-1"`, "missed blocks alert", "validator_health", "how close is it to downtime jail", "double-signs"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("incident_triage lacks %q", want)
+		}
+	}
+
+	if _, err := cs.GetPrompt(ctx, &mcp.GetPromptParams{Name: "incident_triage", Arguments: map[string]string{"node": "nope"}}); err == nil {
+		t.Fatal("unknown node should fail")
+	}
+}
+
+func TestPromptsWithoutCosmosDoNotMentionUpgrades(t *testing.T) {
+	cs, _ := session(t, false)
+	daily, err := cs.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: "daily_check"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(daily.Messages[0].Content.(*mcp.TextContent).Text, "upgrade_readiness") {
+		t.Fatal("daily_check references a tool that is not registered")
 	}
 }

@@ -4,6 +4,8 @@
 package address
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -29,6 +31,38 @@ func ParseConsensus(s string) (string, error) {
 		return "", fmt.Errorf("consensus address must be 20 bytes, got %d", len(data))
 	}
 	return strings.ToUpper(hex.EncodeToString(data)), nil
+}
+
+// EncodeBech32 encodes 8-bit data under the given human-readable prefix.
+func EncodeBech32(hrp string, data []byte) (string, error) {
+	values, err := convertBits(data, 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+	pm := polymod(append(append(expandHRP(hrp), values...), 0, 0, 0, 0, 0, 0)) ^ 1
+	var b strings.Builder
+	b.WriteString(hrp + "1")
+	for _, v := range values {
+		b.WriteByte(charset[v])
+	}
+	for i := range 6 {
+		b.WriteByte(charset[(pm>>uint(5*(5-i)))&31])
+	}
+	return b.String(), nil
+}
+
+// ConsensusFromPubKey derives the hex consensus address from a staking
+// module consensus_pubkey: the first 20 bytes of SHA-256 of an ed25519 key.
+func ConsensusFromPubKey(typeURL, keyB64 string) (string, error) {
+	if typeURL != "/cosmos.crypto.ed25519.PubKey" {
+		return "", fmt.Errorf("unsupported consensus key type %q", typeURL)
+	}
+	key, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil || len(key) != 32 {
+		return "", errors.New("invalid ed25519 public key")
+	}
+	sum := sha256.Sum256(key)
+	return strings.ToUpper(hex.EncodeToString(sum[:20])), nil
 }
 
 const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
