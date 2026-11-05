@@ -2,6 +2,8 @@
 
 A Go MCP server that gives operators read-only insight into CometBFT nodes and validators.
 
+Human contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md). This file is the same ground in more detail.
+
 ## Commands
 
 ```bash
@@ -57,7 +59,6 @@ go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on Cosmos Hub 
 - `main` is protected: changes land through a pull request, squash-merged, with the `test` check passing. No direct pushes, force pushes or deletions — for anyone, admins included.
 - One feature or fix per branch and PR (`feat/…`, `fix/…`, `docs/…`, `ci/…`). The squash commit takes the PR title, so write it as a conventional commit.
 - CI skips `test` when only Markdown, images or `LICENSE` change; the skipped check still counts as passing. Label a PR `e2e` to run the localnet suite on it.
-- Commits and PRs carry no AI attribution.
 
 ## Releasing
 
