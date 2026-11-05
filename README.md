@@ -116,6 +116,8 @@ Then ask: *"Is my-validator signing? How far is it from jail?"*
 | **MCP Registry** | listed as [`io.github.wookja-0/cometbft-mcp`](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wookja-0/cometbft-mcp) |
 | **Glama** | [glama.ai/mcp/servers/wookja-0/cometbft-mcp](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp) |
 
+[![cometbft-mcp MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp/badges/card.svg)](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp)
+
 ## Connect a client
 
 Use absolute paths: most clients do not expand `~`.
