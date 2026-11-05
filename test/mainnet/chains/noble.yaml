@@ -1,0 +1,17 @@
+# noble: validators picked on 2026-11-06 — rank 1, rank 7 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://noble-api.polkachu.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://noble-rpc.polkachu.com
+  - name: top-validator
+    role: validator
+    validator_address: 417E75EF24DE0207B9BFD235331F4897AD28738A
+  - name: bottom-validator
+    role: validator
+    validator_address: F21F8BD8AB575EC5D5B3B691080830CCEC51BD1D
+  - name: jailed
+    role: validator
+    validator_address: F60CC3E3BC7DC6FBDF26BE1A0237554FBD9EDC63

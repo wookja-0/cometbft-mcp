@@ -12,7 +12,7 @@ make lint          # go vet + gofmt
 make build         # bin/cometbft-mcp
 make localnet-up   # 4 validators + 1 sentry in Docker (localnet/)
 make e2e           # MCP over stdio against the localnet (downtime, jail + unjail, upgrade proposal, chain halt; mutates chain state)
-go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on Cosmos Hub public endpoints (~1 min)
+go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 11 mainnets' public endpoints (~2 min)
 ```
 
 ## Map
@@ -33,7 +33,7 @@ go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on Cosmos Hub 
 | `docs/logo/` | brand assets: `icon.svg` (rounded) and `icon-square.svg`, PNG exports, `logo-dark.png` / `logo-light.png` (README header, matched to GitHub's dark and light backgrounds), `social-preview.png` (GitHub social preview, 1280×640) |
 | `docs/demo/` | README demo: `demo.sh` (live scenario), `mcpcall` (calls one tool over stdio), `frame.py` (window frame); see the header of `demo.sh` |
 | `test/e2e/` | build tag `localnet` |
-| `test/mainnet/` | build tag `mainnet`: smoke test at mainnet scale; run it after changing anything that parses chain data |
+| `test/mainnet/` | build tag `mainnet`: smoke test on the chains in `chains/` (one config per chain); run it after changing anything that parses chain data, and add a chain there when you add support for one |
 
 ## Security invariants — never break
 

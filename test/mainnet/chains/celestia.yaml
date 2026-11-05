@@ -1,0 +1,17 @@
+# celestia: validators picked on 2026-11-06 — rank 1, rank 98 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://celestia-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://celestia-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: A6AE5A4868BE44FF6BBA721467406E75F641C698
+  - name: bottom-validator
+    role: validator
+    validator_address: 856A2FE45C6575F5DC77A331AC6C3460C67BE7DB
+  - name: jailed
+    role: validator
+    validator_address: 70C6BD00EE64DB5D60F5ACC8B4629CD610346889

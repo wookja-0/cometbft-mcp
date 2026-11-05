@@ -1,0 +1,17 @@
+# osmosis: validators picked on 2026-11-06 — rank 1, rank 30 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://osmosis-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://osmosis-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: C71EF3C044998473B4CECCAE99771976F198D4A5
+  - name: bottom-validator
+    role: validator
+    validator_address: 0C438AB31C0ACFB5D301F98DB678B6C9CE217E04
+  - name: jailed
+    role: validator
+    validator_address: CB5A63B91E8F4EE8DB935942CBE25724636479E0

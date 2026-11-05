@@ -1,0 +1,17 @@
+# injective: validators picked on 2026-11-06 — rank 1, rank 45 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://injective-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://injective-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: D54959C85E82BD897A724A0701B9DF69D23C6E6E
+  - name: bottom-validator
+    role: validator
+    validator_address: E6643CC7E375FF889EAA59F7FCB93F4DE35403DB
+  - name: jailed
+    role: validator
+    validator_address: 7781FA16ADC57E109F63BD1E29F14F9D3817E14A

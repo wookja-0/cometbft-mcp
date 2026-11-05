@@ -386,8 +386,12 @@ func activeSet(set []comet.Validator, addr string) *ActiveSet {
 }
 
 func validatorSummary(r *ValidatorReport) string {
-	s := fmt.Sprintf("%s [%s]: signed %d/%d blocks (%d–%d), missed %d (%.2f%%)",
-		r.Validator, r.Level, r.Signed+r.NilVotes, r.Signed+r.NilVotes+r.Missed, r.Window.From, r.Window.To, r.Missed, r.MissedPct)
+	blocks := "blocks"
+	if r.Unreadable > 0 {
+		blocks = fmt.Sprintf("readable blocks, %d unreadable", r.Unreadable)
+	}
+	s := fmt.Sprintf("%s [%s]: signed %d/%d %s (%d–%d), missed %d (%.2f%%)",
+		r.Validator, r.Level, r.Signed+r.NilVotes, r.Signed+r.NilVotes+r.Missed, blocks, r.Window.From, r.Window.To, r.Missed, r.MissedPct)
 	if r.MissStreak > 0 {
 		s += fmt.Sprintf(", %d missed in a row at the head", r.MissStreak)
 	}
@@ -396,6 +400,8 @@ func validatorSummary(r *ValidatorReport) string {
 	}
 	if c := r.Cosmos; c != nil && c.Error == nil {
 		switch {
+		case c.Unsupported != "":
+			s += "; no x/slashing on this chain"
 		case c.Tombstoned:
 			s += "; TOMBSTONED"
 		case c.Jailed:

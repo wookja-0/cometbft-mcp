@@ -16,6 +16,8 @@ import (
 // the x/slashing downtime counter.
 type CosmosValidator struct {
 	Error *NodeError `json:"error,omitempty"`
+	// Unsupported explains why there is no slashing view on this chain.
+	Unsupported string `json:"unsupported,omitempty"`
 
 	ConsensusAddress     string     `json:"consensus_address,omitempty"`
 	OperatorAddress      string     `json:"operator_address,omitempty"`
@@ -35,6 +37,8 @@ type CosmosValidator struct {
 }
 
 const CodeWrongChain = "rest_wrong_chain"
+
+const noSlashingModule = "this chain has no x/slashing module (an ICS consumer chain, for example, whose downtime is handled by the provider chain): no jail status or slashing margin"
 
 // cosmosValidator gathers the SDK view of the validator with consensus
 // address hexAddr. Failures are reported inside the result, not as an error,
@@ -62,6 +66,10 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 	}
 
 	params, err := f.cosmos.SlashingParams(ctx)
+	if cosmos.IsUnimplemented(err) {
+		cv.Unsupported = noSlashingModule
+		return cv, []analysis.Finding{{Level: analysis.OK, Code: "no_slashing_module", Message: noSlashingModule + "; judged on signing liveness alone"}}
+	}
 	if err != nil {
 		return fail(err)
 	}
@@ -121,7 +129,7 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 		MissStreak:  streak,
 		BlockTime:   blockTime,
 	})
-	if !cv.Jailed && !cv.Tombstoned {
+	if !cv.Jailed && !cv.Tombstoned && !view.Untracked {
 		cv.MissesUntilJail = &view.MissesUntilJail
 		cv.GraceUntilHeight = view.GraceUntilHeight
 		if view.TimeToJail > 0 {

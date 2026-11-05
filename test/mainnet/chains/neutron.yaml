@@ -1,0 +1,17 @@
+# neutron: validators picked on 2026-11-06 — rank 1, rank 10 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://neutron-api.polkachu.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://rpc.neutron.solva.solutions:443
+  - name: top-validator
+    role: validator
+    validator_address: C94C5F8B549ED0F91EA44E0F88C9680208E56619
+  - name: bottom-validator
+    role: validator
+    validator_address: D66EBDF8CEC7D3F5229A328D90834271F7CA0C1C
+  - name: jailed
+    role: validator
+    validator_address: 86CECACE77141E00646CA4ED42C89F8A1C038777

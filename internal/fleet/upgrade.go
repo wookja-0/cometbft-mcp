@@ -11,6 +11,7 @@ import (
 	"github.com/wookja-0/cometbft-mcp/internal/config"
 	"github.com/wookja-0/cometbft-mcp/internal/sanitize"
 	"github.com/wookja-0/cometbft-mcp/internal/source/comet"
+	"github.com/wookja-0/cometbft-mcp/internal/source/cosmos"
 )
 
 // ErrNoCosmos is returned by tools that need the Cosmos SDK layer.
@@ -115,7 +116,9 @@ func (f *Fleet) Upgrade(ctx context.Context) (*UpgradeReport, error) {
 	}
 
 	props, err := f.cosmos.VotingProposals(ctx)
-	if err != nil {
+	if cosmos.IsUnimplemented(err) {
+		r.Findings = append(r.Findings, analysis.Finding{Level: analysis.OK, Code: "no_gov_v1", Message: "this chain does not serve x/gov v1 (no governance module, as on authority-run chains, or a Cosmos SDK older than 0.46): upgrade proposals in voting are not checked, the x/upgrade plan is"})
+	} else if err != nil {
 		r.Findings = append(r.Findings, analysis.Finding{Level: analysis.Unknown, Code: "proposals_unavailable", Message: "could not read governance proposals: " + f.nodeError(err).Error()})
 	}
 	for _, p := range props {

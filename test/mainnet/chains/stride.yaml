@@ -1,0 +1,14 @@
+# stride: validators picked on 2026-11-06 — rank 1, rank 8 (last in the active set). Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://stride-api.polkachu.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://rpc.stride.citizenweb3.com
+  - name: top-validator
+    role: validator
+    validator_address: 06CB670C96BCA230C98DD5301C0592EC94A2F269
+  - name: bottom-validator
+    role: validator
+    validator_address: FE4E54245813C4A53221FB4C8B053D30AFC9FB0E

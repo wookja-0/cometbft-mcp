@@ -1,0 +1,17 @@
+# akash: validators picked on 2026-11-06 — rank 1, rank 79 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://akash-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://akash-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: B1852D17FA66B5382A8F770725CC5B228B357750
+  - name: bottom-validator
+    role: validator
+    validator_address: 1C5CEC5C50F72BAD8307EFE005D6F1C947B3BC85
+  - name: jailed
+    role: validator
+    validator_address: 923B8FCD3097BA253408CF32F8A77DA355BBC863

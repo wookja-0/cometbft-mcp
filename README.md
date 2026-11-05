@@ -280,7 +280,7 @@ There is deliberately no place for keys, mnemonics or tokens; fields that look l
 | Flag | Default | |
 |---|---|---|
 | `--config` | see above | Path to the config |
-| `--concurrency` | `4` | In-flight requests across all nodes. Gentle on your own nodes; `8` is fine for public RPCs. |
+| `--concurrency` | `4` | In-flight requests across all nodes. Gentle on your own nodes; `8` suits most public RPCs, less for rate-limited ones (HTTP 429). |
 | `--timeout` | `10s` | Per-request timeout |
 | `--reveal-network` | off | Show raw peer IPs, node IDs and transport errors to the model |
 
@@ -384,13 +384,26 @@ Threat model and reporting: [SECURITY.md](SECURITY.md).
 
 ## Compatibility
 
-| | |
-|---|---|
-| CometBFT | Tested on v0.38.25 (Cosmos Hub mainnet) and v0.39.4 (localnet). v0.34 / v0.37 use the same RPC fields but are untested. |
-| Cosmos SDK | Tested on v0.53.8 (Cosmos Hub) and v0.54.4 (localnet) REST; ed25519 consensus keys |
-| Chains | Any CometBFT chain. Forks (celestia-core, sei-tendermint) and ICS consumer chains are untested. |
-| Scale | Cosmos Hub: 180 active / 450+ staking validators. `validator_health` (100 blocks) takes ~5 s over a public RPC at `--concurrency 8`, ~10 s at the default 4. |
-| Not supported | Tendermint2 (gno.land) |
+Tested on 2026-11-06 against 11 mainnets through public endpoints, read-only (`test/mainnet/`), and cross-checked against each chain's own state: the `x/slashing` miss counter and threshold, jailed / tombstoned / bonded status, consensus address and active-set rank.
+
+| Chain | CometBFT | Cosmos SDK | Notes |
+|---|---|---|---|
+| Cosmos Hub | 0.38.25 | 0.53.8 | 180 active / 640+ staking validators |
+| Osmosis | 0.38.22 | 0.50.14 | |
+| Celestia | 0.38.17 | 0.52.12 | |
+| dYdX | 0.38.5 | 0.50.6 | ~1 s blocks |
+| Injective | 1.0.1 | 0.50.15 | |
+| Neutron | 0.38.19 | 0.53.4 | |
+| Akash | 0.38.19 | 0.53.7 | |
+| Juno | 0.38.22 | 0.53.7 | |
+| Kava | 0.37.16 | 0.47.15 | |
+| Noble | 0.38.19 | 0.50.14 | No `x/gov` (authority-run): the upgrade plan is checked, proposals are not |
+| Stride | 0.39.0 | 0.54.3 | ICS consumer, no `x/slashing`: judged on signing liveness alone |
+| localnet (simd) | 0.39.4 | 0.54.4 | e2e: downtime, jail + unjail, upgrade, halt |
+
+Versions are what the chains' `/status` and `node_info` reported. ed25519 consensus keys only. Not supported: Tendermint2 (gno.land).
+
+**Speed and rate limits.** `validator_health` (100 blocks) takes ~5 s over a public RPC at `--concurrency 8`, ~10 s at the default 4. Some public endpoints (cosmos.directory, Polkachu) limit requests by volume: blocks they refuse count as unreadable and the result is `unknown`, never a guess. Lower `--concurrency` or use your own node.
 
 ## Troubleshooting
 
@@ -398,10 +411,11 @@ Threat model and reporting: [SECURITY.md](SECURITY.md).
 |---|---|---|
 | `rpc_unreachable` | Connection refused or DNS failure | URL and port, the SSH tunnel, firewall; the node process |
 | `rpc_timeout` | No answer within `--timeout` | Node load, network latency; raise `--timeout` |
-| `rpc_http_status` | Non-JSON HTTP error | A proxy or load balancer in front of the RPC; the URL path |
+| `rpc_http_status` | Non-JSON HTTP error | A proxy or load balancer in front of the RPC; the URL path. `HTTP 429` is a public endpoint's rate limit: lower `--concurrency` |
 | `rpc_bad_response` | Not a CometBFT JSON-RPC response | The URL points at something else (REST, gRPC-web, a web page) |
 | `height_unavailable` | The node has pruned that height | Use a node with more history, or a smaller `window` |
 | `rest_wrong_chain` | `cosmos.rest` is on another chain than the nodes | The REST URL |
+| `no_slashing_module` / `no_gov_v1` (ok) | The chain does not have that module, e.g. an ICS consumer or an authority-run chain | Nothing: those checks do not apply there |
 | `rest_not_found` / `no_signing_info` | The chain does not know the address | That `validator_address` is the **consensus** address, not `cosmos1…` / `cosmosvaloper1…` |
 | `watched by validator_address only` | A node tool was called for a validator without `rpc` | Expected: only `validator_health` works for it |
 
@@ -424,7 +438,7 @@ make test           # unit tests, no network
 make lint
 make localnet-up    # 4 validators + 1 sentry (simd) in Docker; writes localnet/config.yaml
 make e2e            # MCP over stdio: downtime, a real jail + unjail, an upgrade proposal, a chain halt (~5 min)
-go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on Cosmos Hub public endpoints
+go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 11 mainnets' public endpoints (~2 min)
 ```
 
 The localnet's genesis is tuned so failures show up in seconds (50-block slashing window, 50% min signed, 60 s jail, 30 s voting). Try it interactively:
@@ -441,7 +455,7 @@ CI runs lint and unit tests on every push and pull request (skipped when only do
 
 ## Roadmap
 
-- ICS consumer chains (slashing and jailing live on the provider)
+- ICS consumer chains: read jail status from the provider chain
 - secp256k1 consensus keys
 - Tendermint2 (gno.land) adapter
 

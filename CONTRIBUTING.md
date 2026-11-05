@@ -29,7 +29,7 @@ To see changes against a real chain:
 make localnet-up    # 4 validators + 1 sentry (simd); writes localnet/config.yaml
 make e2e            # MCP over stdio: downtime, jail + unjail, upgrade proposal, chain halt (~5 min)
 make localnet-down
-go test -tags mainnet -v ./test/mainnet/   # read-only smoke test against Cosmos Hub public endpoints
+go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 11 mainnets' public endpoints (~2 min)
 ```
 
 The code map is in [AGENTS.md](AGENTS.md#map).

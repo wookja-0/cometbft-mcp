@@ -1,0 +1,17 @@
+# cosmoshub: validators picked on 2026-11-06 — rank 1, rank 180 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://cosmos-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://cosmos-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: 56B2F053AD136642D3FC9098FB2DD01454F396D5
+  - name: bottom-validator
+    role: validator
+    validator_address: CFDC92BEF0DF6E869B18F33A642208F0C7A9E049
+  - name: jailed
+    role: validator
+    validator_address: 099E2B09583331AFDE35E5FA96673D2CA7DEA316
