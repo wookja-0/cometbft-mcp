@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -160,5 +161,33 @@ func TestPromptsWithoutCosmosDoNotMentionUpgrades(t *testing.T) {
 	}
 	if strings.Contains(daily.Messages[0].Content.(*mcp.TextContent).Text, "upgrade_readiness") {
 		t.Fatal("daily_check references a tool that is not registered")
+	}
+}
+
+// Without a config the server still lists its tools (directories and
+// clients probe this) and every call returns the setup guidance.
+func TestUnconfiguredServerListsToolsAndExplainsSetup(t *testing.T) {
+	setupErr := errors.New("no config file at /x/config.yaml")
+	s := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "test"}, &mcp.ServerOptions{Instructions: UnconfiguredInstructions(setupErr)})
+	RegisterUnconfigured(s, setupErr)
+	ct, st := mcp.NewInMemoryTransports()
+	if _, err := s.Connect(context.Background(), st, nil); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "c", Version: "test"}, nil).Connect(context.Background(), ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cs.Close()
+
+	if got := toolNames(t, cs); got != "consensus_diagnosis,fleet_overview,node_status,peer_health,validator_health" {
+		t.Fatalf("tools = %s", got)
+	}
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "validator_health", Arguments: map[string]any{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "no config file") {
+		t.Fatalf("result = %+v", res.Content)
 	}
 }

@@ -209,7 +209,7 @@ args = ["--config", "/Users/you/.config/cometbft-mcp/config.yaml"]
       "command": "docker",
       "args": ["run", "-i", "--rm",
                "--mount", "type=bind,src=/Users/you/.config/cometbft-mcp/config.yaml,dst=/config/config.yaml,readonly",
-               "ghcr.io/wookja-0/cometbft-mcp:0.3.0"]
+               "ghcr.io/wookja-0/cometbft-mcp:0.3.1"]
     }
   }
 }
@@ -261,6 +261,8 @@ There is deliberately no place for keys, mnemonics or tokens; fields that look l
 | `--reveal-network` | off | Show raw peer IPs, node IDs and transport errors to the model |
 
 `cometbft-mcp check` prints a `node_status` report locally, without an MCP client, to verify a config.
+
+Without a usable config the server still starts: its tools stay listed and each call explains what to create (it never echoes the config's contents, which may hold internal addresses). Fix the file and restart the MCP server.
 
 ## Tools
 
