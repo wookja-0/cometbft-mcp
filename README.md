@@ -1,3 +1,5 @@
+<img src="docs/brand/logo.png" alt="cometbft-mcp logo: a ring of validators, one of them down, around a pulse line" width="112" align="right">
+
 # cometbft-mcp
 
 [![CI](https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml)
