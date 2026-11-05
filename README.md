@@ -418,7 +418,7 @@ make localnet-stop VAL="val2 val3"    # halt the chain; wait a minute: "why did 
 make localnet-down
 ```
 
-CI runs lint and unit tests on every push; the e2e suite runs daily, on demand, and on pull requests labeled `e2e`. Contributor notes and the invariants that must never break: [AGENTS.md](AGENTS.md).
+CI runs lint and unit tests on every push and pull request (skipped when only docs change); the e2e suite runs daily, on demand, and on pull requests labeled `e2e`. Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). The code map and the invariants that must never break: [AGENTS.md](AGENTS.md).
 
 ## Roadmap
 
