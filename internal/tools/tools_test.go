@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -189,5 +190,31 @@ func TestUnconfiguredServerListsToolsAndExplainsSetup(t *testing.T) {
 	}
 	if !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "no config file") {
 		t.Fatalf("result = %+v", res.Content)
+	}
+}
+
+func TestConsensusNodeArgumentIsDescribedForOneNode(t *testing.T) {
+	cs, _ := session(t, false)
+	res, err := cs.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range res.Tools {
+		if tool.Name != "consensus_diagnosis" {
+			continue
+		}
+		raw, _ := json.Marshal(tool.InputSchema)
+		if strings.Contains(string(raw), "every configured node") || !strings.Contains(string(raw), "synced sentry or full node") {
+			t.Fatalf("node argument: %s", raw)
+		}
+		return
+	}
+	t.Fatal("consensus_diagnosis not listed")
+}
+
+func TestUnconfiguredInstructionsReadAsSentences(t *testing.T) {
+	got := UnconfiguredInstructions(errors.New("no config file at /x, then restart the MCP server"))
+	if !strings.Contains(got, "restart the MCP server. Every tool returns") {
+		t.Fatalf("got %q", got)
 	}
 }

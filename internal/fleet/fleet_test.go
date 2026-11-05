@@ -54,6 +54,7 @@ type fakeNode struct {
 	seen        func(addr string) (prevote, precommit bool)
 	atHeightFor time.Duration
 	round       int
+	step        int // consensus step; 0 means Prevote (4)
 }
 
 type fakePeer struct {
@@ -157,6 +158,10 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 			pv = append(pv, vote(pre, "Prevote"))
 			pc = append(pc, vote(com, "Precommit"))
 		}
+		step := n.step
+		if step == 0 {
+			step = 4
+		}
 		var rounds []any
 		for r := 0; r <= n.round; r++ {
 			rounds = append(rounds, map[string]any{"round": r, "prevotes": pv, "precommits": pc, "prevotes_bit_array": "", "precommits_bit_array": ""})
@@ -168,7 +173,7 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 		}
 		rounds = append(rounds, map[string]any{"round": n.round + 1, "prevotes": empty, "precommits": empty, "prevotes_bit_array": "", "precommits_bit_array": ""})
 		return map[string]any{"round_state": map[string]any{
-			"height/round/step": fmt.Sprintf("%d/%d/4", cur, n.round),
+			"height/round/step": fmt.Sprintf("%d/%d/%d", cur, n.round, step),
 			"start_time":        now.Add(-n.atHeightFor),
 			"height_vote_set":   rounds,
 			"proposer":          map[string]any{"address": fc.set(cur)[0], "index": 0},

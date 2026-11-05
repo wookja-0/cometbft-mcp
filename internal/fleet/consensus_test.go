@@ -99,3 +99,26 @@ func TestListConsensusValidatorsTrimsLargeSets(t *testing.T) {
 		t.Fatalf("kept %d, omitted %d", len(kept), omitted)
 	}
 }
+
+// Right after a block the new round has no votes yet; the summary should
+// say so instead of leaving "prevotes 0.0%" to read like an outage.
+func TestConsensusFreshRoundIsExplained(t *testing.T) {
+	fc := &fakeChain{height: 100, set: fourVals, flag: allSigned, nodes: map[string]*fakeNode{
+		"sentry": {step: 1, seen: func(string) (bool, bool) { return false, false }}, // NewHeight
+	}}
+	f := newFleet(t, fc, []config.Node{{Name: "sentry", Role: config.RoleSentry}}, false)
+	r, err := f.Consensus(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Level != analysis.OK || r.Step != "NewHeight" || !strings.Contains(r.Summary, "a new round just started; votes are not in yet") {
+		t.Fatalf("summary = %s", r.Summary)
+	}
+
+	// Once prevoting is under way, no such note.
+	fc.nodes["sentry"].step, fc.nodes["sentry"].seen = 0, nil
+	r, _ = f.Consensus(context.Background(), "")
+	if strings.Contains(r.Summary, "new round just started") {
+		t.Fatalf("summary = %s", r.Summary)
+	}
+}
