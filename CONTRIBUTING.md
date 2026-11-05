@@ -2,6 +2,8 @@
 
 Thanks for helping. Bug reports, chain compatibility reports ("works on X", "breaks on Y"), docs fixes and new checks are all welcome.
 
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md). Issues use templates — pick **Chain compatibility report** to tell us cometbft-mcp works (or does not) on a chain or version.
+
 ## Scope
 
 cometbft-mcp is **read-only by design**: it gives an agent insight into nodes and validators and cannot change anything. Changes that add signing, broadcasting, restarting or reconfiguring — or that read key files — will not be accepted, however convenient. The same goes for anything that weakens network masking or the `<untrusted>` envelope. [SECURITY.md](SECURITY.md) explains why; the invariants are listed in [AGENTS.md](AGENTS.md#security-invariants--never-break).

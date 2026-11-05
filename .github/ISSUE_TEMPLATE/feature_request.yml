@@ -1,0 +1,24 @@
+name: Feature request
+description: A new check, chain support, or an improvement to a judgment.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The operator question
+      description: What do you want to ask your agent that cometbft-mcp cannot answer well today?
+      placeholder: "\"Is my validator about to miss its proposer slot?\""
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Which data it would read (RPC / REST endpoints) and how it would judge it. Link the chain rule if one applies.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This stays read-only — no signing, broadcasting, restarting or reading key files (see CONTRIBUTING.md).
+          required: true
