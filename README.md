@@ -22,7 +22,7 @@ Ask your agent *"Is my validator signing?"*, *"How close is it to jail?"*, *"Why
 Works with any CometBFT chain (Cosmos Hub, Osmosis, any Cosmos SDK chain, non-SDK CometBFT apps) and any MCP client (Claude Code, Claude Desktop, Cursor, VS Code, Codex, Gemini CLI, …).
 
 > [!WARNING]
-> Early release (v0.3). The tool API may still change.
+> Early release (v0.4). The tool API may still change.
 
 <p align="center">
   <img src="docs/demo.gif" width="900" alt="Demo: a fleet check comes back ok; val3 goes down and validator_health reports 19 more misses until downtime jail; val2 goes down too and consensus_diagnosis reports no_quorum, naming val3 and val2">
@@ -218,7 +218,7 @@ args = ["--config", "/Users/you/.config/cometbft-mcp/config.yaml"]
       "command": "docker",
       "args": ["run", "-i", "--rm",
                "--mount", "type=bind,src=/Users/you/.config/cometbft-mcp/config.yaml,dst=/config/config.yaml,readonly",
-               "ghcr.io/wookja-0/cometbft-mcp:0.3.1"]
+               "ghcr.io/wookja-0/cometbft-mcp:0.4.0"]
     }
   }
 }
