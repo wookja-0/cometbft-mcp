@@ -60,7 +60,7 @@ func run(args []string) error {
 	}
 
 	fs := flag.NewFlagSet("cometbft-mcp", flag.ContinueOnError)
-	configPath := fs.String("config", config.DefaultPath(), "path to the node config (env COMETBFT_MCP_CONFIG)")
+	configPath := fs.String("config", config.DefaultPath(), "path to the node config (or set $COMETBFT_MCP_CONFIG to a path, or $COMETBFT_MCP_CONFIG_YAML to the YAML itself)")
 	reveal := fs.Bool("reveal-network", false, "show raw peer IPs, node IDs and transport errors to the model")
 	timeout := fs.Duration("timeout", 10*time.Second, "per-request RPC timeout")
 	concurrency := fs.Int("concurrency", 4, "maximum in-flight requests across all nodes; raise it (e.g. 8) for remote or public RPCs")
@@ -71,9 +71,12 @@ func run(args []string) error {
 	if *concurrency < 1 || *concurrency > 32 {
 		return fmt.Errorf("--concurrency must be between 1 and 32")
 	}
-	cfg, cfgErr := config.Load(*configPath)
+	explicit := false
+	fs.Visit(func(f *flag.Flag) { explicit = explicit || f.Name == "config" })
+	src := config.Resolve(*configPath, explicit, os.Getenv)
+	cfg, cfgErr := src.Load()
 	if cfgErr != nil && cmd == "check" {
-		return fmt.Errorf("config %s: %w", *configPath, cfgErr)
+		return fmt.Errorf("config %s: %w", src, cfgErr)
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -85,8 +88,8 @@ func run(args []string) error {
 	// Without a usable config, still serve: the tools stay listed and each
 	// call explains the setup, instead of the client seeing a dead process.
 	if cfgErr != nil {
-		setupErr := setupError(*configPath, cfgErr)
-		logger.Warn("serving without a config", "path", *configPath, "err", cfgErr)
+		setupErr := setupError(src, cfgErr)
+		logger.Warn("serving without a config", "source", src.String(), "err", cfgErr)
 		s := mcp.NewServer(impl, &mcp.ServerOptions{Instructions: tools.UnconfiguredInstructions(setupErr), Logger: logger})
 		tools.RegisterUnconfigured(s, setupErr)
 		return s.Run(ctx, &mcp.StdioTransport{})
@@ -114,9 +117,12 @@ const exampleConfigURL = "https://github.com/wookja-0/cometbft-mcp/blob/main/con
 // setupError tells the user (through the model) how to fix the config. It
 // never includes the parse error itself: YAML errors quote config values,
 // such as internal node addresses, which must not reach the model.
-func setupError(path string, err error) error {
-	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("no config file at %s. Create it from %s with your nodes' CometBFT RPC URLs (and optionally a Cosmos REST URL), then restart the MCP server", path, exampleConfigURL)
+func setupError(src config.Source, err error) error {
+	switch {
+	case src.Inline != "":
+		return fmt.Errorf("the YAML in $%s is invalid. Run `cometbft-mcp check` with the same environment to see why (format: %s), fix it, then restart the MCP server", config.EnvInline, exampleConfigURL)
+	case errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("no config file at %s. Create it from %s with your nodes' CometBFT RPC URLs (and optionally a Cosmos REST URL), or put the YAML in $%s, then restart the MCP server", src.Path, exampleConfigURL, config.EnvInline)
 	}
-	return fmt.Errorf("the config file at %s is invalid. Run `cometbft-mcp check --config %s` in a terminal to see why, fix it, then restart the MCP server", path, path)
+	return fmt.Errorf("the config file at %s is invalid. Run `cometbft-mcp check --config %s` in a terminal to see why, fix it, then restart the MCP server", src.Path, src.Path)
 }

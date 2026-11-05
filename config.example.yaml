@@ -1,7 +1,8 @@
 # cometbft-mcp configuration example.
 #
 # Copy to ~/.config/cometbft-mcp/config.yaml (or pass --config, or set
-# $COMETBFT_MCP_CONFIG) and replace the URLs and addresses.
+# $COMETBFT_MCP_CONFIG to its path, or put the YAML itself in
+# $COMETBFT_MCP_CONFIG_YAML) and replace the URLs and addresses.
 #
 # There is deliberately no place for keys, mnemonics or tokens: the server
 # never reads them, and fields that look like secrets are rejected.
