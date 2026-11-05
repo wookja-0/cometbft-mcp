@@ -1,17 +1,21 @@
-<img src="docs/brand/logo.png" alt="cometbft-mcp logo: a ring of validators, one of them down, around a pulse line" width="112" align="right">
+<p align="center">
+  <img src="docs/brand/mark.png" width="128" alt="cometbft-mcp logo: a ring of validators, one of them down, around a pulse line">
+</p>
 
-# cometbft-mcp
+<h1 align="center">cometbft-mcp</h1>
 
-[![CI](https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml)
-[![e2e](https://github.com/wookja-0/cometbft-mcp/actions/workflows/e2e.yml/badge.svg)](https://github.com/wookja-0/cometbft-mcp/actions/workflows/e2e.yml)
-[![Release](https://img.shields.io/github/v/release/wookja-0/cometbft-mcp?sort=semver)](https://github.com/wookja-0/cometbft-mcp/releases/latest)
-[![Go](https://img.shields.io/github/go-mod/go-version/wookja-0/cometbft-mcp)](go.mod)
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.wookja--0%2Fcometbft--mcp-5b4bdb)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wookja-0/cometbft-mcp)
-[![Glama](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp/badges/score.svg)](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp)
-[![Container](https://img.shields.io/badge/ghcr.io-wookja--0%2Fcometbft--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/wookja-0/cometbft-mcp/pkgs/container/cometbft-mcp)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+<p align="center">
+  <a href="https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml"><img src="https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/wookja-0/cometbft-mcp/actions/workflows/e2e.yml"><img src="https://github.com/wookja-0/cometbft-mcp/actions/workflows/e2e.yml/badge.svg" alt="e2e"></a>
+  <a href="https://github.com/wookja-0/cometbft-mcp/releases/latest"><img src="https://img.shields.io/github/v/release/wookja-0/cometbft-mcp?sort=semver" alt="Release"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/wookja-0/cometbft-mcp" alt="Go"></a>
+  <a href="https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wookja-0/cometbft-mcp"><img src="https://img.shields.io/badge/MCP_Registry-io.github.wookja--0%2Fcometbft--mcp-5b4bdb" alt="MCP Registry"></a>
+  <a href="https://glama.ai/mcp/servers/wookja-0/cometbft-mcp"><img src="https://glama.ai/mcp/servers/wookja-0/cometbft-mcp/badges/score.svg" alt="Glama"></a>
+  <a href="https://github.com/wookja-0/cometbft-mcp/pkgs/container/cometbft-mcp"><img src="https://img.shields.io/badge/ghcr.io-wookja--0%2Fcometbft--mcp-2496ED?logo=docker&logoColor=white" alt="Container"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License"></a>
+</p>
 
-> A read-only MCP server for CometBFT node and validator operators.
+<p align="center"><b>A read-only MCP server for CometBFT node and validator operators.</b></p>
 
 Ask your agent *"Is my validator signing?"*, *"How close is it to jail?"*, *"Why did the chain stop?"* or *"Are we ready for the upgrade?"* and get an answer grounded in your own nodes and the chain's own slashing state — judged the way an operator would judge them, and unable to change anything.
 
