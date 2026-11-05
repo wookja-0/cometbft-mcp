@@ -264,6 +264,11 @@ func consensusSummary(r *ConsensusReport) string {
 		s += " — " + issue
 	}
 	if r.Level == analysis.OK {
+		// A round that has just begun has no votes yet; say so, or "0.0%"
+		// reads like an outage.
+		if !r.Prevotes.Quorum && earlySteps[r.Step] {
+			s += " — a new round just started; votes are not in yet"
+		}
 		return s // votes still arriving in a healthy round are not news
 	}
 	var missing []string
@@ -281,5 +286,8 @@ func consensusSummary(r *ConsensusReport) string {
 	}
 	return s
 }
+
+// earlySteps are round steps before prevotes are cast.
+var earlySteps = map[string]bool{"NewHeight": true, "NewRound": true, "Propose": true}
 
 func (r *ConsensusReport) GetSummary() string { return r.Summary }
