@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="docs/brand/mark.png" width="128" alt="cometbft-mcp logo: a ring of validators, one of them down, around a pulse line">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/logo-dark.png">
+    <img src="docs/logo/logo-light.png" width="480" alt="cometbft-mcp">
+  </picture>
 </p>
-
-<h1 align="center">cometbft-mcp</h1>
 
 <p align="center">
   <a href="https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml"><img src="https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
