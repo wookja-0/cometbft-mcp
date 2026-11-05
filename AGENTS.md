@@ -10,6 +10,7 @@ make lint          # go vet + gofmt
 make build         # bin/cometbft-mcp
 make localnet-up   # 4 validators + 1 sentry in Docker (localnet/)
 make e2e           # MCP over stdio against the localnet (downtime, jail + unjail, upgrade proposal, chain halt; mutates chain state)
+go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on Cosmos Hub public endpoints (~1 min)
 ```
 
 ## Map
@@ -28,6 +29,7 @@ make e2e           # MCP over stdio against the localnet (downtime, jail + unjai
 | `internal/tools/` | MCP tool registration and descriptions |
 | `localnet/` | simd Dockerfile, genesis/topology setup, compose; `gen-config.sh` writes the (gitignored) MCP config from the running nodes |
 | `test/e2e/` | build tag `localnet` |
+| `test/mainnet/` | build tag `mainnet`: smoke test at mainnet scale; run it after changing anything that parses chain data |
 
 ## Security invariants — never break
 
@@ -36,7 +38,8 @@ make e2e           # MCP over stdio against the localnet (downtime, jail + unjai
 - No key material: no config field, flag or code path that reads key files, keyrings or mnemonics.
 - Every node-controlled string reaches the model through `sanitize.Untrusted`.
 - Peer IPs, node IDs, listen addresses and transport errors go through `sanitize.Network` / `fleet.nodeError`; reveal only behind `--reveal-network`.
-- `TestReportsNeverLeakNetworkDetailsWhenMasked` and the `safehttp` deny tests must keep passing.
+- Structured values from a node (addresses, IDs, ports, enums, durations) pass through only after a format check; never put a decode error's text (`err.Error()` from `encoding/json`, `strconv`, `time`) into output — it quotes the input.
+- `TestReportsNeverLeakNetworkDetailsWhenMasked`, `TestHostileNodeTextStaysEnveloped` and the `safehttp` deny tests must keep passing.
 
 ## Conventions
 

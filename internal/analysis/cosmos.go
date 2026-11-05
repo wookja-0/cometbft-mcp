@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -14,10 +15,10 @@ import (
 func MaxMissed(window int64, minSignedPerWindow string) (int64, error) {
 	r, ok := new(big.Rat).SetString(strings.TrimSpace(minSignedPerWindow))
 	if !ok || r.Sign() < 0 || r.Cmp(big.NewRat(1, 1)) > 0 {
-		return 0, fmt.Errorf("invalid min_signed_per_window %q", minSignedPerWindow)
+		return 0, errors.New("min_signed_per_window is not a decimal between 0 and 1")
 	}
 	if window <= 0 {
-		return 0, fmt.Errorf("invalid signed_blocks_window %d", window)
+		return 0, errors.New("signed_blocks_window is not positive")
 	}
 	return window - roundHalfEven(new(big.Rat).Mul(r, big.NewRat(window, 1))), nil
 }
@@ -77,11 +78,13 @@ func JudgeSlashing(s Slashing) (SlashingView, []Finding) {
 		return v, append(fs, Finding{Critical, "jailed", fmt.Sprintf("jailed; the jail period ended at %s — send an unjail transaction to rejoin", s.JailedUntil.UTC().Format(time.RFC3339))})
 	}
 	if s.Status != "" && s.Status != "BOND_STATUS_BONDED" {
-		fs = append(fs, Finding{Warn, "not_bonded", fmt.Sprintf("staking status is %s: not in the active set (not jailed, so most likely too little stake)", s.Status)})
+		fs = append(fs, Finding{Warn, "not_bonded", fmt.Sprintf("staking status is %s: not in the active set (not jailed, so most likely too little stake)", bondStatus(s.Status))})
 	}
 
 	v.MissesUntilJail = max(s.MaxMissed-s.Missed, 0)
-	if minHeight := s.StartHeight + s.Window; s.Height <= minHeight {
+	// x/slashing jails only while processing a block past minHeight; the next
+	// block is Height+1, so the grace window ends once Height reaches it.
+	if minHeight := s.StartHeight + s.Window; s.Height < minHeight {
 		v.GraceUntilHeight = minHeight
 		if s.Missed > s.MaxMissed {
 			fs = append(fs, Finding{Warn, "jail_after_grace", fmt.Sprintf("already over the miss limit (%d > %d); it will be jailed after height %d unless missed blocks roll out of the window first", s.Missed, s.MaxMissed, minHeight)})
@@ -102,6 +105,16 @@ func JudgeSlashing(s Slashing) (SlashingView, []Finding) {
 		fs = append(fs, Finding{Critical, "time_to_jail", fmt.Sprintf("missing blocks right now: at %.1fs per block it will be jailed in about %s unless it resumes signing", s.BlockTime.Seconds(), v.TimeToJail.Round(time.Second))})
 	}
 	return v, fs
+}
+
+// bondStatus passes the staking enum through; anything else was not
+// produced by x/staking and is labeled as such.
+func bondStatus(s string) string {
+	switch s {
+	case "BOND_STATUS_BONDED", "BOND_STATUS_UNBONDING", "BOND_STATUS_UNBONDED", "BOND_STATUS_UNSPECIFIED":
+		return s
+	}
+	return "unrecognized"
 }
 
 // ---- upgrades ------------------------------------------------------------

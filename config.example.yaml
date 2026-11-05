@@ -1,0 +1,47 @@
+# cometbft-mcp configuration example.
+#
+# Copy to ~/.config/cometbft-mcp/config.yaml (or pass --config, or set
+# $COMETBFT_MCP_CONFIG) and replace the URLs and addresses.
+#
+# There is deliberately no place for keys, mnemonics or tokens: the server
+# never reads them, and fields that look like secrets are rejected.
+
+# Optional: the Cosmos SDK layer — jail status, slashing margin, upgrades,
+# staking monikers. Chain state is the same on every node, so use the REST API
+# (app.toml [api]) of a sentry or full node; the validator's own can stay off.
+# Leave this out for non-SDK CometBFT chains.
+cosmos:
+  rest: http://127.0.0.1:1317
+
+# CometBFT RPC endpoints. Reach them over localhost, an SSH tunnel or a
+# private network — do not open RPC ports to the internet for this. Example:
+#   ssh -N -L 26657:127.0.0.1:26657 -L 1317:127.0.0.1:1317 sentry-1
+#   ssh -N -L 36657:127.0.0.1:26657 validator-1
+nodes:
+  # role: validator | sentry | full
+  # Commits and chain state are read from sentries and full nodes first,
+  # which keeps load off the validator and keeps working while it is down.
+  - name: sentry-1
+    role: sentry
+    rpc: http://127.0.0.1:26657
+
+  - name: validator-1
+    role: validator
+    rpc: http://127.0.0.1:36657
+    # Recommended: the consensus address (hex, or bech32 …valcons1…), from
+    # `<appd> comet show-address` or the node's /status validator_info.address.
+    # With it, validator_health keeps working while this node is down;
+    # without it, the address is read from the node itself.
+    # validator_address: cosmosvalcons1...
+
+  # A validator you cannot (or do not want to) reach directly: omit rpc and
+  # it is watched by address only, from the commits the other nodes serve.
+  # - name: validator-2
+  #   role: validator
+  #   validator_address: cosmosvalcons1...
+
+  # A public RPC also works for read-only checks of chain state; consider
+  # --concurrency 8 for remote endpoints.
+  # - name: public-rpc
+  #   role: full
+  #   rpc: https://rpc.example.com:443

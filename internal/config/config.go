@@ -25,10 +25,13 @@ const (
 	RoleFull      Role = "full"
 )
 
+// Node is a node to inspect. A validator may omit rpc and be watched by
+// validator_address alone: its signing is then judged from the commits
+// other nodes (or a public RPC) serve.
 type Node struct {
 	Name             string `yaml:"name"`
 	Role             Role   `yaml:"role"`
-	RPC              string `yaml:"rpc"`
+	RPC              string `yaml:"rpc,omitempty"`
 	ValidatorAddress string `yaml:"validator_address,omitempty"`
 
 	RPCURL       *url.URL `yaml:"-"`
@@ -57,6 +60,20 @@ func (c *Config) Node(name string) (*Node, bool) {
 		}
 	}
 	return nil, false
+}
+
+// HasRPC reports whether the node's own RPC is configured.
+func (n Node) HasRPC() bool { return n.RPCURL != nil }
+
+// RPCNodes lists the nodes whose RPC is configured, in config order.
+func (c *Config) RPCNodes() []Node {
+	var out []Node
+	for _, n := range c.Nodes {
+		if n.HasRPC() {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // Names lists node names in config order.
@@ -163,8 +180,13 @@ func (c *Config) validate() error {
 		}
 
 		var err error
-		if n.RPCURL, err = parseURL(n.RPC); err != nil {
-			return fmt.Errorf("%s: rpc: %w", where, err)
+		switch {
+		case n.RPC != "":
+			if n.RPCURL, err = parseURL(n.RPC); err != nil {
+				return fmt.Errorf("%s: rpc: %w", where, err)
+			}
+		case n.Role != RoleValidator || n.ValidatorAddress == "":
+			return fmt.Errorf("%s: rpc is required (only a validator with validator_address may omit it)", where)
 		}
 		if n.ValidatorAddress != "" {
 			if n.Role != RoleValidator {
@@ -174,6 +196,9 @@ func (c *Config) validate() error {
 				return fmt.Errorf("%s: validator_address: %w", where, err)
 			}
 		}
+	}
+	if len(c.RPCNodes()) == 0 {
+		return errors.New("at least one node needs an rpc URL (a sentry, full node or public RPC) to read the chain from")
 	}
 	return nil
 }

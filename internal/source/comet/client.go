@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wookja-0/cometbft-mcp/internal/safehttp"
+	"github.com/wookja-0/cometbft-mcp/internal/sanitize"
 	"github.com/wookja-0/cometbft-mcp/internal/source/jsonnum"
 )
 
@@ -197,7 +198,8 @@ func (c *Client) call(ctx context.Context, e safehttp.Endpoint, q url.Values, ou
 		return &Error{Code: CodeBadResponse, Detail: e.Path() + " returned no result"}
 	}
 	if err := json.Unmarshal(env.Result, out); err != nil {
-		return &Error{Code: CodeBadResponse, Detail: e.Path() + ": " + err.Error()}
+		// Not err.Error(): Go's decode errors quote the offending input.
+		return &Error{Code: CodeBadResponse, Detail: e.Path() + " returned fields of an unexpected type"}
 	}
 	return nil
 }
@@ -207,11 +209,9 @@ func rpcError(message, data string) *Error {
 	if data != "" {
 		detail = data
 	}
-	if len(detail) > 200 {
-		detail = detail[:200] + "…"
-	}
+	// The node chose this text: wrap it (Untrusted also truncates).
 	if strings.Contains(data, "is not available") || strings.Contains(data, "must be less than or equal to") {
-		return &Error{Code: CodeHeightUnavailable, Detail: detail}
+		return &Error{Code: CodeHeightUnavailable, Detail: sanitize.Untrusted(detail)}
 	}
-	return &Error{Code: CodeRPCError, Detail: detail}
+	return &Error{Code: CodeRPCError, Detail: sanitize.Untrusted(detail)}
 }

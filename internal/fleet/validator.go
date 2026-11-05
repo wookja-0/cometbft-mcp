@@ -80,7 +80,11 @@ func (f *Fleet) Validator(ctx context.Context, name string, window int) (*Valida
 		if err != nil {
 			return nil, fmt.Errorf("validator_address is not set for %q and its node did not answer (%s); set validator_address in the config so liveness can be checked while the node is down", target.Name, f.nodeError(err).Code)
 		}
-		addr, addrSource = strings.ToUpper(s.ValidatorInfo.Address), "node"
+		var ok bool
+		if addr, ok = consensusAddr(s.ValidatorInfo.Address); !ok {
+			return nil, fmt.Errorf("node %q reported a malformed consensus address %s; set validator_address in the config", target.Name, addr)
+		}
+		addrSource = "node"
 	}
 
 	src, st, err := f.pickSource(ctx, target.Name)
@@ -186,7 +190,7 @@ func (f *Fleet) pickSource(ctx context.Context, target string) (source, *comet.S
 		func(n config.Node) bool { return n.Role == config.RoleValidator && n.Name != target },
 		func(n config.Node) bool { return n.Name == target },
 	} {
-		for _, n := range f.cfg.Nodes {
+		for _, n := range f.cfg.RPCNodes() {
 			if pass(n) {
 				order = append(order, n)
 			}
@@ -220,7 +224,8 @@ type scanner struct {
 	mu   sync.Mutex
 	sets map[string][]comet.Validator // by validators_hash
 
-	first, last *comet.Commit // earliest and latest readable commits, for block time
+	first, last *comet.Commit // earliest and latest readable commits
+	outside     bool          // in neither the first nor the last set; see outsideWindow
 }
 
 func newScanner(src source, addr string) *scanner {
@@ -243,9 +248,7 @@ func (s *scanner) run(ctx context.Context, heights []int64) []analysis.SigStatus
 	}
 	wg.Wait()
 
-	out := make([]analysis.SigStatus, len(heights))
-	for i, c := range commits {
-		out[i] = s.classify(ctx, c)
+	for _, c := range commits {
 		if c != nil {
 			if s.first == nil {
 				s.first = c
@@ -253,7 +256,38 @@ func (s *scanner) run(ctx context.Context, heights []int64) []analysis.SigStatus
 			s.last = c
 		}
 	}
+	s.outside = s.outsideWindow(ctx)
+
+	out := make([]analysis.SigStatus, len(heights))
+	for i, c := range commits {
+		out[i] = s.classify(ctx, c)
+	}
 	return out
+}
+
+// outsideWindow reports whether the validator is in neither the first nor
+// the last scanned height's validator set. Then an address missing from a
+// commit means "not in the set" without fetching the set at every height —
+// which matters on chains like Cosmos Hub, where voting power (and so the
+// set hash) changes nearly every block. The approximation: a validator that
+// joined and left the set entirely inside the window has those heights
+// counted as not-in-set rather than missed.
+func (s *scanner) outsideWindow(ctx context.Context) bool {
+	if s.first == nil {
+		return false
+	}
+	for _, c := range []*comet.Commit{s.first, s.last} {
+		set, err := s.setFor(ctx, int64(c.Header.Height), c.Header.ValidatorsHash)
+		if err != nil {
+			return false
+		}
+		for _, v := range set {
+			if strings.EqualFold(v.Address, s.addr) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // blockTime is the mean block interval over the scanned commits; 0 if unknown.
@@ -277,6 +311,9 @@ func (s *scanner) classify(ctx context.Context, c *comet.Commit) analysis.SigSta
 		if strings.EqualFold(sig.ValidatorAddress, s.addr) {
 			return flagStatus(sig.BlockIDFlag)
 		}
+	}
+	if s.outside {
+		return analysis.SigNotInSet
 	}
 	set, err := s.setFor(ctx, int64(c.Header.Height), c.Header.ValidatorsHash)
 	if err != nil {

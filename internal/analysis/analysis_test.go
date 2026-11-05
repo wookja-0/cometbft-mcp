@@ -135,3 +135,17 @@ func TestJudgeLivenessNoData(t *testing.T) {
 		t.Fatalf("got %v", fs)
 	}
 }
+
+// One unreadable commit at the head (common on public RPCs) must not hide
+// that the validator left the set.
+func TestLeftSetSurvivesUnreadableCommit(t *testing.T) {
+	st := append(repeat(SigSigned, 70), repeat(SigNotInSet, 30)...)
+	st[99] = SigUnknown
+	l := Summarize(heights(1, 100), st)
+	if l.LeftSetAt != 71 {
+		t.Fatalf("left set at = %d", l.LeftSetAt)
+	}
+	if fs := codes(JudgeLiveness(l)); fs["left_active_set"] != Critical {
+		t.Fatalf("got %v", fs)
+	}
+}

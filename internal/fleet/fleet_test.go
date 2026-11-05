@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -36,6 +37,8 @@ type fakeChain struct {
 	flag  func(h int64, addr string) int
 	nodes map[string]*fakeNode
 	rest  *fakeREST // served under /rest/ when set
+	// onValidators, if set, is called on every /validators request.
+	onValidators func()
 }
 
 type fakeNode struct {
@@ -132,8 +135,8 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 		return map[string]any{"signed_header": map[string]any{
 			"header": map[string]any{
 				"height":          strconv.FormatInt(ch, 10),
-				"time":            now.Add(-time.Duration(fc.height-ch+1) * time.Second), // 1s blocks
-				"validators_hash": strings.Join(set, "")[:16] + strconv.Itoa(len(set)),
+				"time":            now.Add(-time.Duration(fc.height-ch+1) * time.Second),                                 // 1s blocks
+				"validators_hash": strings.Join(set, "")[:16] + strconv.Itoa(len(set)) + "-" + strconv.FormatInt(ch, 10), // changes every block, as on Cosmos Hub
 			},
 			"commit": map[string]any{"height": strconv.FormatInt(ch, 10), "signatures": sigs},
 		}}, ""
@@ -171,6 +174,9 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 			"proposer":          map[string]any{"address": fc.set(cur)[0], "index": 0},
 		}}, ""
 	case "/validators":
+		if fc.onValidators != nil {
+			fc.onValidators()
+		}
 		vh, _ := strconv.ParseInt(q.Get("height"), 10, 64)
 		if vh == 0 {
 			vh = h
@@ -193,7 +199,10 @@ func newFleet(t *testing.T, fc *fakeChain, nodes []config.Node, reveal bool) *Fl
 	}
 	yaml.WriteString("nodes:\n")
 	for _, n := range nodes {
-		fmt.Fprintf(&yaml, "  - name: %s\n    role: %s\n    rpc: %s/%s/\n", n.Name, n.Role, srv.URL, n.Name)
+		fmt.Fprintf(&yaml, "  - name: %s\n    role: %s\n", n.Name, n.Role)
+		if n.RPC != "-" { // "-" = watched by address only
+			fmt.Fprintf(&yaml, "    rpc: %s/%s/\n", srv.URL, n.Name)
+		}
 		if n.ValidatorAddress != "" {
 			fmt.Fprintf(&yaml, "    validator_address: %s\n", n.ValidatorAddress)
 		}
@@ -515,5 +524,74 @@ func TestRevealNetworkShowsDetails(t *testing.T) {
 	r, _ := f.Peers(context.Background(), "")
 	if p := r.Nodes[0].Peers[0]; p.Address != "34.1.2.3" || p.NodeID != "abcdef0123456789abcdef0123456789abcdef01" || r.Masked {
 		t.Fatalf("peer = %+v", p)
+	}
+}
+
+func TestValidatorWatchedByAddressOnly(t *testing.T) {
+	fc := &fakeChain{
+		height: 100, set: fourVals,
+		flag: func(h int64, a string) int {
+			if a == addrC && h > 95 {
+				return comet.FlagAbsent
+			}
+			return comet.FlagCommit
+		},
+		nodes: map[string]*fakeNode{"public": {}},
+	}
+	f := newFleet(t, fc, []config.Node{
+		{Name: "public", Role: config.RoleFull},
+		{Name: "mine", Role: config.RoleValidator, RPC: "-", ValidatorAddress: addrC},
+	}, false)
+	ctx := context.Background()
+
+	r, err := f.Validator(ctx, "", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Validator != "mine" || r.SourceNode != "public" || r.MissStreak != 4 {
+		t.Fatalf("report = %+v", r)
+	}
+	st, err := f.Status(ctx, "")
+	if err != nil || len(st.Nodes) != 1 || st.Nodes[0].Name != "public" || st.Level != analysis.OK {
+		t.Fatalf("status should cover only nodes with an RPC: %+v, %v", st, err)
+	}
+	for _, call := range []func() error{
+		func() error { _, err := f.Status(ctx, "mine"); return err },
+		func() error { _, err := f.Peers(ctx, "mine"); return err },
+		func() error { _, err := f.Consensus(ctx, "mine"); return err },
+	} {
+		if err := call(); err == nil || !strings.Contains(err.Error(), "watched by validator_address only") {
+			t.Errorf("err = %v", err)
+		}
+	}
+	ov, err := f.Overview(ctx)
+	if err != nil || len(ov.Nodes) != 1 || len(ov.Validators) != 1 || ov.Validators[0].Level != analysis.Critical {
+		t.Fatalf("overview = %+v, %v", ov, err)
+	}
+}
+
+// A validator outside the set at both ends of the window costs two set
+// fetches, not one per height, even when the set hash changes every block.
+func TestOutsideValidatorDoesNotFetchEverySet(t *testing.T) {
+	var setFetches atomic.Int32
+	fc := &fakeChain{
+		height: 200,
+		set:    func(h int64) []string { return []string{addrA, addrB, addrC} }, // D never in the set
+		flag:   allSigned,
+		nodes:  map[string]*fakeNode{"full": {}},
+	}
+	fc.onValidators = func() { setFetches.Add(1) }
+	f := newFleet(t, fc, []config.Node{{Name: "full", Role: config.RoleFull}, {Name: "d", Role: config.RoleValidator, ValidatorAddress: addrD}}, false)
+
+	r, err := f.Validator(context.Background(), "d", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.NotInSet != 100 || r.Missed != 0 {
+		t.Fatalf("report = %+v", r)
+	}
+	// first + last window heights, plus the current set for active_set.
+	if n := setFetches.Load(); n > 3 {
+		t.Fatalf("fetched the validator set %d times", n)
 	}
 }

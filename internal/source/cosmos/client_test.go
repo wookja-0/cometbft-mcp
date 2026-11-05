@@ -147,15 +147,17 @@ func TestUpgradePlanAndProposals(t *testing.T) {
 		case "/cosmos/upgrade/v1beta1/current_plan":
 			w.Write([]byte(`{"plan":{"name":"v2","time":"0001-01-01T00:00:00Z","height":"1200","info":"","upgraded_client_state":null}}`))
 		case "/cosmos/gov/v1/proposals":
-			if r.URL.Query().Get("proposal_status") != "PROPOSAL_STATUS_VOTING_PERIOD" {
+			if r.URL.Query().Get("pagination.reverse") != "true" || r.URL.Query().Has("proposal_status") {
 				t.Errorf("query = %s", r.URL.RawQuery)
 			}
 			w.Write([]byte(`{"proposals":[
 				{"id":"3","title":"Upgrade to v3","status":"PROPOSAL_STATUS_VOTING_PERIOD","voting_end_time":"2026-10-28T12:00:00Z",
 				 "messages":[{"@type":"/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade","authority":"cosmos10d07y","plan":{"name":"v3","height":"5000","info":""}}]},
 				{"id":"4","title":"Community spend","status":"PROPOSAL_STATUS_VOTING_PERIOD","voting_end_time":"2026-10-29T12:00:00Z",
-				 "messages":[{"@type":"/cosmos.distribution.v1beta1.MsgCommunityPoolSpend"}]}
-			],"pagination":{"next_key":null,"total":"2"}}`))
+				 "messages":[{"@type":"/cosmos.distribution.v1beta1.MsgCommunityPoolSpend"}]},
+				{"id":"2","title":"Old upgrade","status":"PROPOSAL_STATUS_PASSED",
+				 "messages":[{"@type":"/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade","plan":{"name":"v1","height":"100"}}]}
+			],"pagination":{"next_key":null,"total":"3"}}`))
 		}
 	}))
 	defer srv.Close()

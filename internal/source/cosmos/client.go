@@ -9,10 +9,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/wookja-0/cometbft-mcp/internal/safehttp"
+	"github.com/wookja-0/cometbft-mcp/internal/sanitize"
 	"github.com/wookja-0/cometbft-mcp/internal/source/jsonnum"
 )
 
@@ -99,6 +101,8 @@ func (p Proposal) UpgradePlan() *Plan {
 	return nil
 }
 
+var bech32PrefixRe = regexp.MustCompile(`^[a-z0-9]{1,83}$`)
+
 type Client struct {
 	http *safehttp.Client
 	base *url.URL
@@ -120,8 +124,8 @@ func (c *Client) Bech32Prefix(ctx context.Context) (string, error) {
 	if err := c.get(ctx, safehttp.CosmosBech32Prefix, "", nil, &out); err != nil {
 		return "", err
 	}
-	if out.Bech32Prefix == "" {
-		return "", &Error{Code: CodeBadResponse, Detail: "empty bech32 prefix"}
+	if !bech32PrefixRe.MatchString(out.Bech32Prefix) {
+		return "", &Error{Code: CodeBadResponse, Detail: "bech32 prefix is not lowercase alphanumeric"}
 	}
 	return out.Bech32Prefix, nil
 }
@@ -189,16 +193,33 @@ func (c *Client) CurrentPlan(ctx context.Context) (*Plan, error) {
 	return out.Plan, nil
 }
 
+// recentProposals is how many of the newest proposals are checked for ones
+// in their voting period.
+const recentProposals = 50
+
 // VotingProposals lists proposals currently in their voting period.
+//
+// It reads the newest proposals and filters locally instead of using the
+// proposal_status filter: a filtered query walks from the oldest proposal,
+// and on long-lived chains (Cosmos Hub) the node fails to decode legacy
+// content types it no longer registers ("no concrete type registered for
+// /cosmos.params.v1beta1.ParameterChangeProposal"). Voting-period proposals
+// are always among the newest.
 func (c *Client) VotingProposals(ctx context.Context) ([]Proposal, error) {
-	q := url.Values{"proposal_status": {"PROPOSAL_STATUS_VOTING_PERIOD"}, "pagination.limit": {"50"}}
+	q := url.Values{"pagination.reverse": {"true"}, "pagination.limit": {strconv.Itoa(recentProposals)}}
 	var out struct {
 		Proposals []Proposal `json:"proposals"`
 	}
 	if err := c.get(ctx, safehttp.CosmosProposals, "", q, &out); err != nil {
 		return nil, err
 	}
-	return out.Proposals, nil
+	var voting []Proposal
+	for _, p := range out.Proposals {
+		if p.Status == "PROPOSAL_STATUS_VOTING_PERIOD" {
+			voting = append(voting, p)
+		}
+	}
+	return voting, nil
 }
 
 func (c *Client) get(ctx context.Context, e safehttp.Endpoint, segment string, q url.Values, out any) error {
@@ -212,11 +233,8 @@ func (c *Client) get(ctx context.Context, e safehttp.Endpoint, segment string, q
 		Message string `json:"message"`
 	}
 	if json.Unmarshal(body, &gwErr) == nil && gwErr.Code != nil && *gwErr.Code != 0 {
-		detail := gwErr.Message
-		if len(detail) > 200 {
-			detail = detail[:200] + "…"
-		}
-		if *gwErr.Code == 5 { // gRPC NotFound
+		detail := sanitize.Untrusted(gwErr.Message) // the server chose this text
+		if *gwErr.Code == 5 {                       // gRPC NotFound
 			return &Error{Code: CodeNotFound, Detail: detail}
 		}
 		return &Error{Code: CodeRESTError, Detail: detail}

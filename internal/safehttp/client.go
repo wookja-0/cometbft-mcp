@@ -54,7 +54,7 @@ var (
 	CosmosSigningInfo    = Endpoint{path: "/cosmos/slashing/v1beta1/signing_infos/", segment: bech32Segment}
 	CosmosValidators     = Endpoint{path: "/cosmos/staking/v1beta1/validators", params: page}
 	CosmosUpgradePlan    = Endpoint{path: "/cosmos/upgrade/v1beta1/current_plan"}
-	CosmosProposals      = Endpoint{path: "/cosmos/gov/v1/proposals", params: append([]string{"proposal_status"}, page...)}
+	CosmosProposals      = Endpoint{path: "/cosmos/gov/v1/proposals", params: append([]string{"pagination.reverse"}, page...)}
 )
 
 var allowlist = map[string]Endpoint{}

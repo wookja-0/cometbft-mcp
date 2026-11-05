@@ -3,3 +3,4 @@
 *.test
 *.out
 /localnet/config.yaml
+.DS_Store
