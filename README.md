@@ -16,7 +16,11 @@ Works with any CometBFT chain (Cosmos Hub, Osmosis, any Cosmos SDK chain, non-SD
 > [!WARNING]
 > Early release (v0.3). The tool API may still change.
 
-<!-- Demo GIF goes here: docs/demo.gif -->
+<p align="center">
+  <img src="docs/demo.gif" width="900" alt="Demo: a fleet check comes back ok; val3 goes down and validator_health reports 19 more misses until downtime jail; val2 goes down too and consensus_diagnosis reports no_quorum, naming val3 and val2">
+  <br>
+  <sub>Real tool output against the bundled localnet — nodes are actually stopped; waits are compressed. <a href="docs/demo/demo.sh">Reproduce it</a>.</sub>
+</p>
 
 **Contents:** [What you can ask](#what-you-can-ask) · [Quick start](#quick-start-1-minute-public-rpc) · [Install](#install) · [Connect a client](#connect-a-client) · [Configuration](#configuration) · [Tools](#tools) · [Security model](#security-model) · [How it decides](#how-it-decides) · [Troubleshooting](#troubleshooting) · [FAQ](#faq) · [Development](#development)
 

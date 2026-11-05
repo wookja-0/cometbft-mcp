@@ -28,6 +28,7 @@ go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on Cosmos Hub 
 | `internal/address/` | hex / bech32 valcons consensus addresses |
 | `internal/tools/` | MCP tool registration and descriptions |
 | `localnet/` | simd Dockerfile, genesis/topology setup, compose; `gen-config.sh` writes the (gitignored) MCP config from the running nodes |
+| `docs/demo/` | README demo: `demo.sh` (live scenario), `mcpcall` (calls one tool over stdio), `frame.py` (window frame); see the header of `demo.sh` |
 | `test/e2e/` | build tag `localnet` |
 | `test/mainnet/` | build tag `mainnet`: smoke test at mainnet scale; run it after changing anything that parses chain data |
 
