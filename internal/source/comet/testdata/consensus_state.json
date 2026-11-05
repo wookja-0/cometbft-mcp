@@ -1,0 +1,53 @@
+{
+  "jsonrpc": "2.0",
+  "id": -1,
+  "result": {
+    "round_state": {
+      "height/round/step": "8/0/6",
+      "start_time": "2026-10-28T08:58:47.738498675Z",
+      "proposal_block_hash": "8238CFD3BA2EE2A0CFAFDACEFCDE3570658313F335216FE3C229BD2908BB512D",
+      "locked_block_hash": "8238CFD3BA2EE2A0CFAFDACEFCDE3570658313F335216FE3C229BD2908BB512D",
+      "valid_block_hash": "8238CFD3BA2EE2A0CFAFDACEFCDE3570658313F335216FE3C229BD2908BB512D",
+      "height_vote_set": [
+        {
+          "round": 0,
+          "prevotes": [
+            "Vote{0:13AF8D62809E 8/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 8238CFD3BA2E A1263AA561F1 000000000000 @ 2026-10-28T08:58:47.850234217Z}",
+            "Vote{1:4D099B4DB54F 8/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 8238CFD3BA2E 40000901A2E8 000000000000 @ 2026-10-28T08:58:47.872027217Z}",
+            "Vote{2:85C8B14D9D86 8/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 8238CFD3BA2E C1936F0DD9E3 000000000000 @ 2026-10-28T08:58:47.850219217Z}",
+            "Vote{3:DD078635471D 8/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 8238CFD3BA2E 254E1C838C27 000000000000 @ 2026-10-28T08:58:47.734164509Z}"
+          ],
+          "prevotes_bit_array": "BA{4:xxxx} 400/400 = 1.00",
+          "precommits": [
+            "nil-Vote",
+            "nil-Vote",
+            "Vote{2:85C8B14D9D86 8/00/SIGNED_MSG_TYPE_PRECOMMIT(Precommit) 8238CFD3BA2E 922B29CCC2F6 000000000000 @ 2026-10-28T08:58:47.947255926Z}",
+            "nil-Vote"
+          ],
+          "precommits_bit_array": "BA{4:__x_} 100/400 = 0.25"
+        },
+        {
+          "round": 1,
+          "prevotes": [
+            "nil-Vote",
+            "nil-Vote",
+            "nil-Vote",
+            "nil-Vote"
+          ],
+          "prevotes_bit_array": "BA{4:____} 0/400 = 0.00",
+          "precommits": [
+            "nil-Vote",
+            "nil-Vote",
+            "nil-Vote",
+            "nil-Vote"
+          ],
+          "precommits_bit_array": "BA{4:____} 0/400 = 0.00"
+        }
+      ],
+      "proposer": {
+        "address": "DD078635471DC65B7F4CE967DDF237393A7A6033",
+        "index": 3
+      }
+    }
+  }
+}

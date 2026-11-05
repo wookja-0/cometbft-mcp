@@ -9,7 +9,7 @@ make test          # unit tests (no network)
 make lint          # go vet + gofmt
 make build         # bin/cometbft-mcp
 make localnet-up   # 4 validators + 1 sentry in Docker (localnet/)
-make e2e           # MCP over stdio against the localnet (downtime, jail + unjail, upgrade proposal; mutates chain state)
+make e2e           # MCP over stdio against the localnet (downtime, jail + unjail, upgrade proposal, chain halt; mutates chain state)
 ```
 
 ## Map
@@ -46,3 +46,7 @@ make e2e           # MCP over stdio against the localnet (downtime, jail + unjai
 - Tools that need optional config (e.g. `upgrade_readiness` needs `cosmos.rest`) are registered only when it is present, and prompts must not mention unregistered tools.
 - Tool descriptions say what / when / returns / NOT, and stay under 2,048 characters (`internal/tools/tools_test.go`).
 - Conventional commits.
+
+## Releasing
+
+Bump `version` and the image tag in `server.json` (and the image tag in README), then push a `vX.Y.Z` tag. `.github/workflows/release.yml` checks they agree, tests, builds binaries and the multi-arch image with provenance attestations, creates the GitHub release, and publishes `server.json` to the MCP Registry over GitHub OIDC.

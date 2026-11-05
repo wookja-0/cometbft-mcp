@@ -77,7 +77,7 @@ func incidentTriage(cfg *config.Config, n *config.Node, symptom string) string {
 		fmt.Fprintf(&b, "Reported symptom (operator's words): %s\n", symptom)
 	}
 	b.WriteString("\nGather evidence in this order, stopping to reason after each step:\n")
-	fmt.Fprintf(&b, "1. node_status for %q and for the whole fleet (omit node) — is it reachable, synced, behind the others? Is the whole chain stalled?\n", n.Name)
+	fmt.Fprintf(&b, "1. node_status for %q and for the whole fleet (omit node) — is it reachable, synced, behind the others? Is the whole chain stalled? If no node has a new block, call consensus_diagnosis next: it shows who is not voting.\n", n.Name)
 	fmt.Fprintf(&b, "2. peer_health for %q — isolated, too few peers, wrong chain, unexpected public peers?\n", n.Name)
 	step := 3
 	if n.Role == config.RoleValidator {

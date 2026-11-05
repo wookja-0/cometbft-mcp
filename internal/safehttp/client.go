@@ -30,8 +30,9 @@ type Endpoint struct {
 // Path returns the request path, e.g. "/status".
 func (e Endpoint) Path() string { return e.path }
 
-// CometBFT RPC endpoints (URI-over-HTTP form of JSON-RPC) and the Prometheus
-// exporter. Everything here is a read; nothing mutates node or chain state.
+// CometBFT RPC endpoints (URI-over-HTTP form of JSON-RPC). Everything here
+// is a read; nothing mutates node or chain state. /dump_consensus_state is
+// deliberately absent: it lists every peer's address.
 var (
 	CometHealth     = Endpoint{path: "/health"}
 	CometStatus     = Endpoint{path: "/status"}
@@ -39,7 +40,7 @@ var (
 	CometABCIInfo   = Endpoint{path: "/abci_info"}
 	CometValidators = Endpoint{path: "/validators", params: []string{"height", "page", "per_page"}}
 	CometCommit     = Endpoint{path: "/commit", params: []string{"height"}}
-	Metrics         = Endpoint{path: "/metrics"}
+	CometConsensus  = Endpoint{path: "/consensus_state"}
 )
 
 // Cosmos SDK REST (gRPC-gateway) query endpoints.
@@ -60,7 +61,7 @@ var allowlist = map[string]Endpoint{}
 
 func init() {
 	for _, e := range []Endpoint{
-		CometHealth, CometStatus, CometNetInfo, CometABCIInfo, CometValidators, CometCommit, Metrics,
+		CometHealth, CometStatus, CometNetInfo, CometABCIInfo, CometValidators, CometCommit, CometConsensus,
 		CosmosNodeInfo, CosmosBech32Prefix, CosmosSlashingParams, CosmosSigningInfo, CosmosValidators, CosmosUpgradePlan, CosmosProposals,
 	} {
 		allowlist[e.path] = e
@@ -70,7 +71,7 @@ func init() {
 // deniedPrefixes are paths that mutate state or the node's p2p layer. None of
 // them is in the allowlist; this is a second, explicit line of defense that a
 // future allowlist edit cannot silently undo.
-var deniedPrefixes = []string{"/broadcast_", "/unsafe_", "/dial_", "/check_tx", "/cosmos/tx/"}
+var deniedPrefixes = []string{"/broadcast_", "/unsafe_", "/dial_", "/check_tx", "/dump_consensus_state", "/cosmos/tx/"}
 
 // Error codes. Error messages never carry the node URL or the raw transport
 // error, because both can contain internal addresses.

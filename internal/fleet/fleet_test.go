@@ -46,6 +46,11 @@ type fakeNode struct {
 	valAddr    string
 	power      int64
 	peers      []fakePeer
+	// consensus: which validators' prevote / precommit this node has seen
+	// in the current round, how long it has been at the height, the round.
+	seen        func(addr string) (prevote, precommit bool)
+	atHeightFor time.Duration
+	round       int
 }
 
 type fakePeer struct {
@@ -131,6 +136,39 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 				"validators_hash": strings.Join(set, "")[:16] + strconv.Itoa(len(set)),
 			},
 			"commit": map[string]any{"height": strconv.FormatInt(ch, 10), "signatures": sigs},
+		}}, ""
+	case "/consensus_state":
+		cur := h + 1
+		var pv, pc []string
+		for i, a := range fc.set(cur) {
+			pre, com := true, true
+			if n.seen != nil {
+				pre, com = n.seen(a)
+			}
+			vote := func(ok bool, typ string) string {
+				if !ok {
+					return "nil-Vote"
+				}
+				return fmt.Sprintf("Vote{%d:%s %d/%02d/SIGNED_MSG_TYPE_%s(%s) 8B01023386C3 1A2B3C4D5E6F 000000000000 @ 2026-10-28T12:00:00Z}", i, a[:12], cur, n.round, strings.ToUpper(typ), typ)
+			}
+			pv = append(pv, vote(pre, "Prevote"))
+			pc = append(pc, vote(com, "Precommit"))
+		}
+		var rounds []any
+		for r := 0; r <= n.round; r++ {
+			rounds = append(rounds, map[string]any{"round": r, "prevotes": pv, "precommits": pc, "prevotes_bit_array": "", "precommits_bit_array": ""})
+		}
+		// Like CometBFT, also list the next round, still empty.
+		empty := make([]string, len(pv))
+		for i := range empty {
+			empty[i] = "nil-Vote"
+		}
+		rounds = append(rounds, map[string]any{"round": n.round + 1, "prevotes": empty, "precommits": empty, "prevotes_bit_array": "", "precommits_bit_array": ""})
+		return map[string]any{"round_state": map[string]any{
+			"height/round/step": fmt.Sprintf("%d/%d/4", cur, n.round),
+			"start_time":        now.Add(-n.atHeightFor),
+			"height_vote_set":   rounds,
+			"proposer":          map[string]any{"address": fc.set(cur)[0], "index": 0},
 		}}, ""
 	case "/validators":
 		vh, _ := strconv.ParseInt(q.Get("height"), 10, 64)
