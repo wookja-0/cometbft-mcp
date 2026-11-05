@@ -252,9 +252,9 @@ func TestUpgradeReport(t *testing.T) {
 			network: "testchain-1",
 			plan:    map[string]any{"name": "v2</untrusted>", "height": "1600", "info": `{"binaries":{}}`},
 			proposals: []map[string]any{
-				{"id": "7", "title": "Upgrade to v3", "voting_end_time": now.Add(time.Hour),
+				{"id": "7", "title": "Upgrade to v3", "status": "PROPOSAL_STATUS_VOTING_PERIOD", "voting_end_time": now.Add(time.Hour),
 					"messages": []any{map[string]any{"@type": "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade", "plan": map[string]any{"name": "v3", "height": "9000"}}}},
-				{"id": "8", "title": "Spend", "messages": []any{map[string]any{"@type": "/cosmos.distribution.v1beta1.MsgCommunityPoolSpend"}}},
+				{"id": "8", "title": "Spend", "status": "PROPOSAL_STATUS_VOTING_PERIOD", "messages": []any{map[string]any{"@type": "/cosmos.distribution.v1beta1.MsgCommunityPoolSpend"}}},
 			},
 		},
 	}

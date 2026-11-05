@@ -14,6 +14,8 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,7 +27,18 @@ import (
 	"github.com/wookja-0/cometbft-mcp/internal/tools"
 )
 
-var version = "dev" // set by -ldflags "-X main.version=…"
+// version is set by -ldflags "-X main.version=…" in release builds; for
+// `go install …@vX.Y.Z` it falls back to the module version.
+var version = "dev"
+
+func init() {
+	if version != "dev" {
+		return
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		version = strings.TrimPrefix(bi.Main.Version, "v")
+	}
+}
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -48,6 +61,7 @@ func run(args []string) error {
 	configPath := fs.String("config", config.DefaultPath(), "path to the node config (env COMETBFT_MCP_CONFIG)")
 	reveal := fs.Bool("reveal-network", false, "show raw peer IPs, node IDs and transport errors to the model")
 	timeout := fs.Duration("timeout", 10*time.Second, "per-request RPC timeout")
+	concurrency := fs.Int("concurrency", 4, "maximum in-flight requests across all nodes; raise it (e.g. 8) for remote or public RPCs")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -56,7 +70,10 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("config %s: %w", *configPath, err)
 	}
-	f := fleet.New(cfg, safehttp.New(safehttp.Options{Timeout: *timeout}), fleet.Options{RevealNetwork: *reveal})
+	if *concurrency < 1 || *concurrency > 32 {
+		return fmt.Errorf("--concurrency must be between 1 and 32")
+	}
+	f := fleet.New(cfg, safehttp.New(safehttp.Options{Timeout: *timeout, MaxConcurrent: *concurrency}), fleet.Options{RevealNetwork: *reveal})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

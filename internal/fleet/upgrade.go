@@ -131,7 +131,7 @@ func (f *Fleet) Upgrade(ctx context.Context) (*UpgradeReport, error) {
 	}
 
 	versions := map[string]string{}
-	r.Nodes = each(f.cfg.Nodes, func(n config.Node) NodeVersion {
+	r.Nodes = each(f.cfg.RPCNodes(), func(n config.Node) NodeVersion {
 		nv := NodeVersion{Name: n.Name}
 		c := f.clients[n.Name]
 		s, err := c.Status(ctx)

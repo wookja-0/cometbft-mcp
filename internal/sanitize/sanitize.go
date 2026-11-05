@@ -5,6 +5,8 @@ package sanitize
 import (
 	"net"
 	"net/netip"
+	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -69,7 +71,10 @@ type Network struct {
 // sentry topology; the address itself is what an attacker wants.
 func (n Network) IP(s string) string {
 	if n.Reveal {
-		return s
+		if _, err := netip.ParseAddr(strings.Trim(s, "[]")); err == nil {
+			return s
+		}
+		return Untrusted(s) // revealing is about addresses, not arbitrary node text
 	}
 	return IPClass(s)
 }
@@ -108,25 +113,38 @@ func isCGNAT(a netip.Addr) bool { return a.Is4() && cgnat.Contains(a) }
 
 // NodeID shortens a p2p node ID to a stable, non-dialable prefix.
 func (n Network) NodeID(id string) string {
-	if n.Reveal || len(id) <= 8 {
+	if !nodeIDRe.MatchString(id) {
+		return Untrusted(id)
+	}
+	if n.Reveal {
 		return id
 	}
 	return id[:8] + "…"
 }
 
+// nodeIDRe matches a p2p node ID: hex, as CometBFT derives it from the node key.
+var nodeIDRe = regexp.MustCompile(`^[0-9a-fA-F]{8,64}$`)
+var schemeRe = regexp.MustCompile(`^[a-z][a-z0-9+.-]{0,15}$`)
+
 // ListenAddr masks the host part of a listen address such as
 // "tcp://0.0.0.0:26656", keeping scheme and port.
 func (n Network) ListenAddr(addr string) string {
-	if n.Reveal {
-		return addr
-	}
 	scheme, rest, ok := strings.Cut(addr, "://")
 	if !ok {
 		scheme, rest = "", addr
 	}
 	host, port, err := net.SplitHostPort(rest)
-	if err != nil {
+	if err != nil || (scheme != "" && !schemeRe.MatchString(scheme)) {
 		return "masked"
+	}
+	if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+		return "masked"
+	}
+	if n.Reveal {
+		if _, err := netip.ParseAddr(strings.Trim(host, "[]")); err == nil {
+			return addr
+		}
+		return Untrusted(addr)
 	}
 	masked := IPClass(host) + ":" + port
 	if scheme != "" {

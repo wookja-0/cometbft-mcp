@@ -49,8 +49,8 @@ type ConsensusValidator struct {
 	Node      string  `json:"node,omitempty"`    // name in the config, if it is ours
 	Moniker   string  `json:"moniker,omitempty"` // from x/staking, if available
 	PowerPct  float64 `json:"power_pct"`
-	Prevote   string  `json:"prevote"`   // block | nil | missing
-	Precommit string  `json:"precommit"` // block | nil | missing
+	Prevote   string  `json:"prevote"`   // block | nil | missing | unknown
+	Precommit string  `json:"precommit"` // block | nil | missing | unknown
 }
 
 const consensusNote = "Votes are as seen by source_node; another node may have received more. " +
@@ -71,9 +71,9 @@ func (f *Fleet) Consensus(ctx context.Context, node string) (*ConsensusReport, e
 		}
 		src = s
 	} else {
-		n, ok := f.cfg.Node(node)
-		if !ok {
-			return nil, fmt.Errorf("unknown node %q; configured nodes: %s", node, strings.Join(f.cfg.Names(), ", "))
+		n, err := f.rpcNode(node)
+		if err != nil {
+			return nil, err
 		}
 		src = source{n.Name, f.clients[n.Name]}
 	}
@@ -111,10 +111,17 @@ func (f *Fleet) Consensus(ctx context.Context, node string) (*ConsensusReport, e
 	var prevotePower, precommitPower, missingPower int64
 	var missing []string
 	var all []ConsensusValidator
-	tally := func(votes []comet.Vote, i int, power int64, t *VoteTally, sum *int64) string {
+	mismatched := 0
+	tally := func(votes []comet.Vote, i int, addr string, power int64, t *VoteTally, sum *int64) string {
 		if i >= len(votes) || !votes[i].Received {
 			t.Missing++
 			return "missing"
+		}
+		// Votes are listed by position; make sure this one is from the
+		// validator at that position (a set from another height would shift it).
+		if !votes[i].MatchesAddress(addr) {
+			mismatched++
+			return "unknown"
 		}
 		*sum += power
 		if votes[i].ForNil {
@@ -125,9 +132,10 @@ func (f *Fleet) Consensus(ctx context.Context, node string) (*ConsensusReport, e
 	}
 	for i, v := range set {
 		power := int64(v.VotingPower)
-		cv := ConsensusValidator{Address: v.Address, Node: names[v.Address], Moniker: monikers[v.Address], PowerPct: roundTo(pctOf(power, r.TotalPower), 2)}
-		cv.Prevote = tally(current.Prevotes, i, power, &r.Prevotes, &prevotePower)
-		cv.Precommit = tally(current.Precommits, i, power, &r.Precommits, &precommitPower)
+		addr, _ := consensusAddr(v.Address)
+		cv := ConsensusValidator{Address: addr, Node: names[addr], Moniker: monikers[addr], PowerPct: roundTo(pctOf(power, r.TotalPower), 2)}
+		cv.Prevote = tally(current.Prevotes, i, v.Address, power, &r.Prevotes, &prevotePower)
+		cv.Precommit = tally(current.Precommits, i, v.Address, power, &r.Precommits, &precommitPower)
 		if cv.Prevote == "missing" {
 			missingPower += power
 			missing = append(missing, cv.label())
@@ -145,6 +153,10 @@ func (f *Fleet) Consensus(ctx context.Context, node string) (*ConsensusReport, e
 	r.Precommits.Quorum = analysis.HasQuorum(precommitPower, r.TotalPower)
 
 	r.Validators, r.ValidatorsOmitted = listConsensusValidators(all)
+	if mismatched > 0 {
+		r.Findings = append(r.Findings, analysis.Finding{Level: analysis.Unknown, Code: "vote_set_mismatch",
+			Message: fmt.Sprintf("%d votes did not match the validator at their position (the validator set read may be from another height); those are shown as unknown and not counted", mismatched)})
+	}
 
 	r.Findings = append(r.Findings, analysis.JudgeConsensus(analysis.Consensus{
 		Now:             now,
@@ -169,8 +181,10 @@ func (cv ConsensusValidator) label() string {
 		return cv.Node
 	case cv.Moniker != "":
 		return cv.Moniker
-	default:
+	case hexAddrRe.MatchString(cv.Address):
 		return cv.Address[:12] + "…"
+	default:
+		return cv.Address // already wrapped as untrusted
 	}
 }
 
@@ -226,7 +240,7 @@ func (f *Fleet) monikers(ctx context.Context) map[string]string {
 // anyReachable returns the first node that answers /status, synced or not.
 func (f *Fleet) anyReachable(ctx context.Context) (source, error) {
 	var tried []string
-	for _, n := range f.cfg.Nodes {
+	for _, n := range f.cfg.RPCNodes() {
 		if _, err := f.clients[n.Name].Status(ctx); err == nil {
 			return source{n.Name, f.clients[n.Name]}, nil
 		} else {

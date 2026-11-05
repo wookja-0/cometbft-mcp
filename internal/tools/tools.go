@@ -145,7 +145,11 @@ func cond(ok bool, yes, no string) string {
 func Instructions(cfg *config.Config) string {
 	var nodes []string
 	for _, n := range cfg.Nodes {
-		nodes = append(nodes, fmt.Sprintf("%s (%s)", n.Name, n.Role))
+		if n.HasRPC() {
+			nodes = append(nodes, fmt.Sprintf("%s (%s)", n.Name, n.Role))
+		} else {
+			nodes = append(nodes, fmt.Sprintf("%s (validator watched by address only: validator_health works, node tools do not)", n.Name))
+		}
 	}
 	return "cometbft-mcp is a read-only operations assistant for CometBFT nodes and validators. " +
 		"It cannot sign, broadcast, restart or reconfigure anything, and it never reads key files. " +

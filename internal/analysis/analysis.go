@@ -202,7 +202,13 @@ func Summarize(heights []int64, statuses []SigStatus) Liveness {
 		l.MissStreak++
 	}
 	if seenInSet {
-		for i := len(statuses) - 1; i >= 0 && statuses[i] == SigNotInSet; i-- {
+		for i := len(statuses) - 1; i >= 0; i-- {
+			if statuses[i] == SigUnknown {
+				continue // an unreadable commit does not end the run
+			}
+			if statuses[i] != SigNotInSet {
+				break
+			}
 			l.LeftSetAt = heights[i]
 		}
 	}

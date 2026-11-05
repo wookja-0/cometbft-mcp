@@ -39,7 +39,7 @@ Validator operators should not have to trust an LLM with their infrastructure. S
 - **Node text is untrusted.** Monikers, versions and other node-controlled strings are wrapped in `<untrusted>` tags, truncated, and stripped of control characters, so a hostile peer cannot inject instructions into your agent.
 - **Gentle on nodes.** A global concurrency cap and bounded block scans; commits are read from sentries or full nodes first, not from the validator.
 
-Details: [docs/security.md](docs/security.md).
+Details: [SECURITY.md](SECURITY.md).
 
 ## Tools
 
@@ -68,9 +68,39 @@ Container (`ghcr.io/wookja-0/cometbft-mcp`, distroless, non-root): the only host
 
 Also listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.wookja-0/cometbft-mcp`.
 
+## Quick start with a public RPC
+
+No access to your nodes needed to try it — point it at a public RPC and watch any validator by its consensus address:
+
+```yaml
+cosmos:
+  rest: https://cosmos-rest.publicnode.com
+nodes:
+  - name: public
+    role: full
+    rpc: https://cosmos-rpc.publicnode.com:443
+  - name: my-validator
+    role: validator
+    validator_address: cosmosvalcons1…   # yours, or any validator's
+```
+
+```bash
+cometbft-mcp check --config hub.yaml
+claude mcp add cometbft -- cometbft-mcp --config $PWD/hub.yaml --concurrency 8
+```
+
+Then ask: *"Is my-validator signing? How far is it from jail?"*
+
 ## Configure
 
-`~/.config/cometbft-mcp/config.yaml` (or `--config`, or `$COMETBFT_MCP_CONFIG`):
+`~/.config/cometbft-mcp/config.yaml` (or `--config`, or `$COMETBFT_MCP_CONFIG`). Start from the commented [`config.example.yaml`](config.example.yaml):
+
+```bash
+mkdir -p ~/.config/cometbft-mcp
+cp config.example.yaml ~/.config/cometbft-mcp/config.yaml
+```
+
+In short:
 
 ```yaml
 # Optional: the Cosmos SDK layer (jail status, slashing margin, upgrades).
@@ -87,7 +117,14 @@ nodes:
     rpc: http://127.0.0.1:36657
     # Lets validator_health work while this node is down. Hex or bech32 valcons.
     validator_address: cosmosvalcons1…
+  - name: val-2
+    role: validator
+    # No rpc: watched by address only. validator_health reads its signatures
+    # from the other nodes; node_status / peer_health skip it.
+    validator_address: cosmosvalcons1…
 ```
+
+Flags: `--concurrency` (in-flight requests across all nodes, default 4 — gentle on your own nodes; 8 is fine for public RPCs), `--timeout` (per request, default 10s), `--reveal-network`.
 
 Check it from the command line:
 
@@ -159,9 +196,10 @@ With the Cosmos SDK layer it then reads the chain's own verdict inputs: `x/slash
 
 | | |
 |---|---|
-| CometBFT | v0.34 – v0.39 (tested on v0.39.4 via simd v0.54.4) |
-| Cosmos SDK | v0.47 – v0.54 REST (tested on v0.54.4); ed25519 consensus keys |
+| CometBFT | Tested on v0.38.25 (Cosmos Hub mainnet) and v0.39.4 (localnet). v0.34 / v0.37 use the same RPC fields but are untested. |
+| Cosmos SDK | Tested on v0.53.8 (Cosmos Hub) and v0.54.4 (localnet) REST; ed25519 consensus keys |
 | Chains | Any CometBFT chain. Forks (celestia-core, sei-tendermint) and ICS consumer chains are untested. |
+| Scale | Cosmos Hub: 180 active / 450+ staking validators. `validator_health` (100 blocks) takes ~5 s over a public RPC at `--concurrency 8`, ~10 s at the default 4. |
 | Not supported | Tendermint2 (Gno) |
 
 ## Roadmap

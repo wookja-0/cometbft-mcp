@@ -53,7 +53,10 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 	if err != nil {
 		return fail(err)
 	}
-	raw, _ := hex.DecodeString(hexAddr)
+	raw, err := hex.DecodeString(hexAddr)
+	if err != nil {
+		return fail(&cosmos.Error{Code: cosmos.CodeBadResponse, Detail: "validator address is not hex"})
+	}
 	if cv.ConsensusAddress, err = address.EncodeBech32(prefix+"valcons", raw); err != nil {
 		return fail(err)
 	}
@@ -65,6 +68,9 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 	cv.SigningWindow = int64(params.SignedBlocksWindow)
 	cv.MinSignedPerWindow = params.MinSignedPerWindow
 	cv.DowntimeJailDuration = params.DowntimeJailDuration
+	if _, err := time.ParseDuration(cv.DowntimeJailDuration); err != nil {
+		cv.DowntimeJailDuration = sanitize.Untrusted(cv.DowntimeJailDuration)
+	}
 	if cv.MaxMissed, err = analysis.MaxMissed(cv.SigningWindow, params.MinSignedPerWindow); err != nil {
 		return fail(&cosmos.Error{Code: cosmos.CodeBadResponse, Detail: err.Error()})
 	}
@@ -73,9 +79,9 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 	if vals, err := f.cosmos.Validators(ctx); err == nil {
 		for _, v := range vals {
 			if a, err := address.ConsensusFromPubKey(v.ConsensusPubkey.Type, v.ConsensusPubkey.Key); err == nil && a == hexAddr {
-				cv.OperatorAddress = v.OperatorAddress
+				cv.OperatorAddress = bech32Addr(v.OperatorAddress)
 				cv.Moniker = sanitize.Untrusted(v.Description.Moniker)
-				cv.Status = v.Status
+				cv.Status = bondStatus(v.Status)
 				cv.Jailed = v.Jailed
 				break
 			}
@@ -123,6 +129,15 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 		}
 	}
 	return cv, fs
+}
+
+// bondStatus passes x/staking's enum through and wraps anything else.
+func bondStatus(s string) string {
+	switch s {
+	case "BOND_STATUS_BONDED", "BOND_STATUS_UNBONDING", "BOND_STATUS_UNBONDED", "BOND_STATUS_UNSPECIFIED":
+		return s
+	}
+	return sanitize.Untrusted(s)
 }
 
 // checkRESTChain makes sure cosmos.rest serves the same chain as the nodes.

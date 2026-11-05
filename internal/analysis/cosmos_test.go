@@ -153,3 +153,18 @@ func TestJudgeVersions(t *testing.T) {
 		t.Fatalf("got %+v", fs)
 	}
 }
+
+// x/slashing can jail while processing the block after StartHeight+Window,
+// so once the head reaches that height the grace window is over.
+func TestJudgeSlashingGraceBoundary(t *testing.T) {
+	s := base()
+	s.StartHeight, s.Window, s.MaxMissed, s.Missed = 950, 50, 25, 24
+	s.Height = 999 // the next block is 1000 = minHeight: still cannot jail
+	if v, _ := JudgeSlashing(s); v.GraceUntilHeight != 1000 {
+		t.Fatalf("height 999: %+v", v)
+	}
+	s.Height = 1000 // the next block is 1001 > minHeight: can jail
+	if v, fs := JudgeSlashing(s); v.GraceUntilHeight != 0 || codes(fs)["jail_imminent"] != Critical {
+		t.Fatalf("height 1000: %+v %v", v, codes(fs))
+	}
+}

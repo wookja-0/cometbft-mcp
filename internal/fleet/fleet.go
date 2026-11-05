@@ -49,7 +49,7 @@ func New(cfg *config.Config, h *safehttp.Client, opts Options) *Fleet {
 	if f.now == nil {
 		f.now = time.Now
 	}
-	for _, n := range cfg.Nodes {
+	for _, n := range cfg.RPCNodes() {
 		f.clients[n.Name] = comet.NewClient(h, n.RPCURL)
 	}
 	if cfg.Cosmos != nil {
@@ -91,16 +91,29 @@ func (e *NodeError) Error() string {
 	return e.Code + ": " + e.Detail
 }
 
-// selectNodes resolves an optional node name to the nodes to inspect.
+// selectNodes resolves an optional node name to the nodes whose RPC to
+// inspect; "" means every node with an RPC.
 func (f *Fleet) selectNodes(name string) ([]config.Node, error) {
 	if name == "" {
-		return f.cfg.Nodes, nil
+		return f.cfg.RPCNodes(), nil
 	}
+	n, err := f.rpcNode(name)
+	if err != nil {
+		return nil, err
+	}
+	return []config.Node{*n}, nil
+}
+
+// rpcNode looks up a node by name and requires its RPC to be configured.
+func (f *Fleet) rpcNode(name string) (*config.Node, error) {
 	n, ok := f.cfg.Node(name)
 	if !ok {
 		return nil, fmt.Errorf("unknown node %q; configured nodes: %s", name, strings.Join(f.cfg.Names(), ", "))
 	}
-	return []config.Node{*n}, nil
+	if !n.HasRPC() {
+		return nil, fmt.Errorf("node %q is watched by validator_address only (no rpc in the config): use validator_health for it", name)
+	}
+	return n, nil
 }
 
 // each runs fn for every node concurrently and returns results in input order.
@@ -118,7 +131,28 @@ func each[T any](nodes []config.Node, fn func(config.Node) T) []T {
 	return out
 }
 
-var chainIDRe = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,64}$`)
+var (
+	chainIDRe    = regexp.MustCompile(`^[a-zA-Z0-9._-]{1,64}$`)
+	hexAddrRe    = regexp.MustCompile(`^[0-9A-Fa-f]{40}$`)
+	bech32AddrRe = regexp.MustCompile(`^[a-z0-9]{1,110}$`)
+)
+
+// consensusAddr returns a node-reported consensus address in upper-case hex
+// when it is well-formed; anything else is wrapped as untrusted and false.
+func consensusAddr(s string) (string, bool) {
+	if hexAddrRe.MatchString(s) {
+		return strings.ToUpper(s), true
+	}
+	return sanitize.Untrusted(s), false
+}
+
+// bech32Addr passes a well-formed bech32 address through and wraps anything else.
+func bech32Addr(s string) string {
+	if bech32AddrRe.MatchString(s) {
+		return s
+	}
+	return sanitize.Untrusted(s)
+}
 
 // chainID passes through well-formed chain IDs and wraps anything else.
 func chainID(s string) string {

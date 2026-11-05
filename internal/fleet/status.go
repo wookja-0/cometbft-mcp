@@ -51,7 +51,8 @@ func (f *Fleet) Status(ctx context.Context, name string) (*StatusReport, error) 
 		return nil, err
 	}
 	// Lag is judged against the whole fleet even when one node is asked for.
-	all := each(f.cfg.Nodes, func(n config.Node) rawStatus {
+	fleetNodes := f.cfg.RPCNodes()
+	all := each(fleetNodes, func(n config.Node) rawStatus {
 		c := f.clients[n.Name]
 		s, err := c.Status(ctx)
 		if err != nil {
@@ -61,11 +62,11 @@ func (f *Fleet) Status(ctx context.Context, name string) (*StatusReport, error) 
 		return rawStatus{status: s, abci: a}
 	})
 	byName := map[string]rawStatus{}
-	for i, n := range f.cfg.Nodes {
+	for i, n := range fleetNodes {
 		byName[n.Name] = all[i]
 	}
 
-	ref := referenceHeights(f.cfg.Nodes, all)
+	ref := referenceHeights(fleetNodes, all)
 	now := f.now()
 	var report StatusReport
 	var names []string
@@ -146,10 +147,10 @@ func (f *Fleet) nodeStatus(n config.Node, r rawStatus, ref map[string]int64, now
 	}, now, f.thresholds)...)
 
 	if n.Role == config.RoleValidator {
-		ns.ValidatorAddress = s.ValidatorInfo.Address
+		ns.ValidatorAddress, _ = consensusAddr(s.ValidatorInfo.Address)
 		vp := int64(s.ValidatorInfo.VotingPower)
 		ns.VotingPower = &vp
-		if n.ValidatorHex != "" && n.ValidatorHex != s.ValidatorInfo.Address {
+		if n.ValidatorHex != "" && n.ValidatorHex != ns.ValidatorAddress {
 			ns.Findings = append(ns.Findings, analysis.Finding{Level: analysis.Warn, Code: "address_mismatch", Message: "the node signs with a different consensus key than validator_address in the config"})
 		}
 		if vp == 0 {

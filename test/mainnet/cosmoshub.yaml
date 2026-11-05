@@ -1,0 +1,22 @@
+# Read-only smoke test against Cosmos Hub public endpoints (see mainnet_test.go).
+# Validators were picked on 2026-11-05: the top-power validator, the one at
+# rank 100, and a jailed, unbonded one. Their state can change over time.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://cosmos-rest.publicnode.com
+nodes:
+  - name: publicnode
+    role: full
+    rpc: https://cosmos-rpc.publicnode.com:443
+  - name: cosmos-directory
+    role: full
+    rpc: https://rpc.cosmos.directory/cosmoshub
+  - name: top-validator
+    role: validator
+    validator_address: 56B2F053AD136642D3FC9098FB2DD01454F396D5
+  - name: rank-100
+    role: validator
+    validator_address: 87A281DAB244C963A994E8A9CBA40062267DB005
+  - name: jailed
+    role: validator
+    validator_address: E5464CB88318A98724BFFE9E0C59129A2B35F11E
