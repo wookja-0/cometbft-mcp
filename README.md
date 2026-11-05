@@ -3,7 +3,9 @@
 [![CI](https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/wookja-0/cometbft-mcp/actions/workflows/ci.yml)
 [![e2e](https://github.com/wookja-0/cometbft-mcp/actions/workflows/e2e.yml/badge.svg)](https://github.com/wookja-0/cometbft-mcp/actions/workflows/e2e.yml)
 [![Release](https://img.shields.io/github/v/release/wookja-0/cometbft-mcp?sort=semver)](https://github.com/wookja-0/cometbft-mcp/releases/latest)
-[![Go Report Card](https://goreportcard.com/badge/github.com/wookja-0/cometbft-mcp)](https://goreportcard.com/report/github.com/wookja-0/cometbft-mcp)
+[![Go](https://img.shields.io/github/go-mod/go-version/wookja-0/cometbft-mcp)](go.mod)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.wookja--0%2Fcometbft--mcp-5b4bdb)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wookja-0/cometbft-mcp)
+[![Glama](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp/badges/score.svg)](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp)
 [![Container](https://img.shields.io/badge/ghcr.io-wookja--0%2Fcometbft--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/wookja-0/cometbft-mcp/pkgs/container/cometbft-mcp)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
@@ -104,7 +106,8 @@ Then ask: *"Is my-validator signing? How far is it from jail?"*
 | **Binary** | Linux and macOS (amd64/arm64) from [Releases](https://github.com/wookja-0/cometbft-mcp/releases), with build-provenance attestations: `gh attestation verify <file> --repo wookja-0/cometbft-mcp` |
 | **Go** | `go install github.com/wookja-0/cometbft-mcp/cmd/cometbft-mcp@latest` |
 | **Container** | `ghcr.io/wookja-0/cometbft-mcp` — distroless, non-root; the only host access it needs is your config, mounted read-only |
-| **MCP Registry** | listed as `io.github.wookja-0/cometbft-mcp` |
+| **MCP Registry** | listed as [`io.github.wookja-0/cometbft-mcp`](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.wookja-0/cometbft-mcp) |
+| **Glama** | [glama.ai/mcp/servers/wookja-0/cometbft-mcp](https://glama.ai/mcp/servers/wookja-0/cometbft-mcp) |
 
 ## Connect a client
 
