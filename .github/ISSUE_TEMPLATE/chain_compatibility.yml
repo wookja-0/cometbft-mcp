@@ -1,0 +1,47 @@
+name: Chain compatibility report
+description: Tell us cometbft-mcp works — or does not — on a chain or version.
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports like this decide what the README lists as tested. Both "it works" and "it breaks" help.
+        **This issue is public:** do not paste node URLs or internal IPs.
+  - type: input
+    id: chain
+    attributes:
+      label: Chain
+      placeholder: "osmosis-1"
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: CometBFT and Cosmos SDK versions
+      description: "`/status` → `node_info.version`; `/cosmos/base/tendermint/v1beta1/node_info` → `application_version`."
+      placeholder: "CometBFT v0.38.x, SDK v0.50.x"
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options: [Everything works, Works partially, Does not work]
+    validations:
+      required: true
+  - type: checkboxes
+    id: tools
+    attributes:
+      label: Tools tried
+      options:
+        - label: fleet_overview
+        - label: node_status
+        - label: peer_health
+        - label: validator_health
+        - label: consensus_diagnosis
+        - label: upgrade_readiness
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: What broke (error codes, wrong numbers), and anything unusual about the chain (ICS consumer, a CometBFT fork, secp256k1 consensus keys…).

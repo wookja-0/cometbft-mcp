@@ -1,0 +1,69 @@
+name: Bug report
+description: A tool returns a wrong judgment, an error, or crashes.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **This issue is public:** do not paste node URLs, internal IPs, or anything secret. cometbft-mcp never needs keys — never paste key files or mnemonics anywhere.
+        Security problems go to a [private report](https://github.com/wookja-0/cometbft-mcp/security/advisories/new) instead.
+  - type: input
+    id: version
+    attributes:
+      label: cometbft-mcp version
+      description: Output of `cometbft-mcp version`.
+      placeholder: "0.3.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it runs
+      options: [Release binary, go install, Container image, Built from source]
+    validations:
+      required: true
+  - type: input
+    id: chain
+    attributes:
+      label: Chain and versions
+      description: Chain ID, and the CometBFT / Cosmos SDK versions if you know them (`/status` → `node_info.version`).
+      placeholder: "cosmoshub-4, CometBFT v0.38.25, SDK v0.53.8"
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: "Claude Code 2.x, Cursor, …"
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Tool
+      options: [fleet_overview, node_status, peer_health, validator_health, consensus_diagnosis, upgrade_readiness, Not tool-specific]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The tool's summary line and finding codes, or the error. Remove anything identifying your infrastructure.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: For a wrong judgment, what the chain actually shows (an explorer link, `/status`, the slashing params…).
+  - type: textarea
+    id: config
+    attributes:
+      label: Config (redacted)
+      description: Only the shape matters. Replace URLs and addresses with placeholders.
+      render: yaml
+  - type: checkboxes
+    id: redacted
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed internal URLs, IPs and anything secret from this report.
+          required: true
