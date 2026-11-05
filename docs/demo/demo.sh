@@ -5,7 +5,9 @@
 #   make localnet-up            # then wait until height > 60 (past the slashing grace window)
 #   go build -o /tmp/mcpcall ./docs/demo/mcpcall && make build
 #   asciinema rec --headless --window-size 96x24 -c docs/demo/demo.sh /tmp/demo.cast
-#   agg --theme github-dark --font-family Menlo --font-size 16 --idle-time-limit 2 /tmp/demo.cast docs/demo.gif
+#   agg --theme github-dark --font-family Menlo --font-size 16 --line-height 1.35 \
+#       --idle-time-limit 2 --last-frame-duration 5 --fps-cap 20 /tmp/demo.cast /tmp/demo-raw.gif
+#   python3 docs/demo/frame.py /tmp/demo-raw.gif docs/demo.gif      # needs Pillow
 #   make localnet-start VAL="val2 val3"
 set -euo pipefail
 cd "$(dirname "$0")/../.."
