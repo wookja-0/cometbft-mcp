@@ -20,4 +20,7 @@ LABEL io.modelcontextprotocol.server.name="io.github.wookja-0/cometbft-mcp" \
       org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=build /out/cometbft-mcp /cometbft-mcp
 USER nonroot:nonroot
-ENTRYPOINT ["/cometbft-mcp", "--config", "/config/config.yaml"]
+# Mount a config at /config/config.yaml, or pass the YAML itself in
+# COMETBFT_MCP_CONFIG_YAML (it takes precedence over this path).
+ENV COMETBFT_MCP_CONFIG=/config/config.yaml
+ENTRYPOINT ["/cometbft-mcp"]

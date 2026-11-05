@@ -11,7 +11,7 @@ import (
 
 func TestSetupErrorMissingFile(t *testing.T) {
 	_, err := config.Load(filepath.Join(t.TempDir(), "missing.yaml"))
-	got := setupError("/home/op/.config/cometbft-mcp/config.yaml", err).Error()
+	got := setupError(config.Source{Path: "/home/op/.config/cometbft-mcp/config.yaml"}, err).Error()
 	if !strings.Contains(got, "no config file at /home/op/.config/cometbft-mcp/config.yaml") || !strings.Contains(got, exampleConfigURL) {
 		t.Fatalf("got %q", got)
 	}
@@ -26,8 +26,20 @@ func TestSetupErrorNeverEchoesConfigContent(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an invalid config")
 	}
-	got := setupError(path, err).Error()
+	got := setupError(config.Source{Path: path}, err).Error()
 	if strings.Contains(got, "10.9.8.7") || !strings.Contains(got, "cometbft-mcp check --config") {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestSetupErrorInlineNeverEchoesContent(t *testing.T) {
+	src := config.Source{Inline: "nodes: [{name: a, role: 10.9.8.7, rpc: 'http://10.9.8.7:26657'}]"}
+	_, err := src.Load()
+	if err == nil {
+		t.Fatal("expected an invalid config")
+	}
+	got := setupError(src, err).Error()
+	if strings.Contains(got, "10.9.8.7") || !strings.Contains(got, config.EnvInline) {
 		t.Fatalf("got %q", got)
 	}
 }

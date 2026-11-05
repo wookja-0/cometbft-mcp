@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -83,20 +82,6 @@ func (c *Config) Names() []string {
 		out[i] = n.Name
 	}
 	return out
-}
-
-// DefaultPath resolves the config location: $COMETBFT_MCP_CONFIG, then
-// $XDG_CONFIG_HOME/cometbft-mcp/config.yaml, then ~/.config/cometbft-mcp/config.yaml.
-func DefaultPath() string {
-	if p := os.Getenv("COMETBFT_MCP_CONFIG"); p != "" {
-		return p
-	}
-	dir := os.Getenv("XDG_CONFIG_HOME")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".config")
-	}
-	return filepath.Join(dir, "cometbft-mcp", "config.yaml")
 }
 
 func Load(path string) (*Config, error) {

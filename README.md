@@ -224,12 +224,24 @@ args = ["--config", "/Users/you/.config/cometbft-mcp/config.yaml"]
 }
 ```
 
+Or skip the mount and pass the config inline: `"-e", "COMETBFT_MCP_CONFIG_YAML={nodes: [...]}"` before the image name.
+
 Inside a container `127.0.0.1` is the container itself: point the config at `host.docker.internal` (Docker Desktop) or add `--network host` (Linux) to reach SSH tunnels on the host.
 </details>
 
 ## Configuration
 
-`~/.config/cometbft-mcp/config.yaml`, or `--config`, or `$COMETBFT_MCP_CONFIG`. Start from the commented [`config.example.yaml`](config.example.yaml).
+Where the config comes from, first match wins:
+
+1. `--config <path>`
+2. `$COMETBFT_MCP_CONFIG_YAML` — the YAML itself, for places that take environment variables but not files (containers, hosted MCP runners). Flow style fits on one line:
+   ```bash
+   COMETBFT_MCP_CONFIG_YAML='{cosmos: {rest: "https://cosmos-rest.publicnode.com"}, nodes: [{name: public, role: full, rpc: "https://cosmos-rpc.publicnode.com:443"}]}'
+   ```
+3. `$COMETBFT_MCP_CONFIG` — a path
+4. `~/.config/cometbft-mcp/config.yaml`
+
+Start from the commented [`config.example.yaml`](config.example.yaml).
 
 ```yaml
 # Optional: the Cosmos SDK layer (jail status, slashing margin, upgrades, monikers).
