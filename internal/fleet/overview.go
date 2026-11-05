@@ -19,6 +19,7 @@ type OverviewReport struct {
 	Level      analysis.Level      `json:"level"`
 	Nodes      []OverviewNode      `json:"nodes"`
 	Validators []OverviewValidator `json:"validators"`
+	Consensus  *OverviewItem       `json:"consensus,omitempty"`
 	Upgrade    *OverviewItem       `json:"upgrade,omitempty"`
 }
 
@@ -92,6 +93,11 @@ func (f *Fleet) Overview(ctx context.Context) (*OverviewReport, error) {
 		levels = append(levels, v.Level)
 	}
 
+	if cr, err := f.Consensus(ctx, ""); err == nil {
+		r.Consensus = &OverviewItem{Level: cr.Level, Summary: cr.Summary}
+		levels = append(levels, cr.Level)
+	}
+
 	if f.cosmos != nil {
 		if up, err := f.Upgrade(ctx); err == nil {
 			r.Upgrade = &OverviewItem{Level: up.Level, Summary: up.Summary}
@@ -142,6 +148,9 @@ func overviewSummary(r *OverviewReport) string {
 	s := fmt.Sprintf("[%s] %s", r.Level, count(len(r.Nodes), "nodes", nl))
 	if len(r.Validators) > 0 {
 		s += ", " + count(len(r.Validators), "validators", vl)
+	}
+	if r.Consensus != nil && r.Consensus.Level != analysis.OK {
+		s += "; consensus " + r.Consensus.Summary
 	}
 	if r.Upgrade != nil {
 		s += "; " + r.Upgrade.Summary

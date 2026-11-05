@@ -146,3 +146,52 @@ func TestValidatorsPaginates(t *testing.T) {
 		t.Fatalf("vals = %+v", vals)
 	}
 }
+
+func TestConsensusState(t *testing.T) {
+	// Captured mid-round on the localnet: all four prevotes in, one precommit.
+	c := fixtureServer(t, map[string]string{"/consensus_state": "consensus_state.json"})
+	rs, err := c.ConsensusState(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Round 1 is already present (empty): CometBFT tracks round+1 ahead.
+	if rs.Height != 8 || rs.Round != 0 || StepName(rs.Step) != "Precommit" || rs.StartTime.IsZero() || len(rs.Rounds) != 2 {
+		t.Fatalf("round state = %+v", rs)
+	}
+	cur := rs.Current()
+	if cur.Round != 0 {
+		t.Fatalf("current round = %d", cur.Round)
+	}
+	pv, pc := cur.Prevotes, cur.Precommits
+	if len(pv) != 4 || len(pc) != 4 {
+		t.Fatalf("votes = %d / %d", len(pv), len(pc))
+	}
+	for i, v := range pv {
+		if !v.Received || v.ForNil {
+			t.Errorf("prevote %d = %+v", i, v)
+		}
+	}
+	if !pv[0].MatchesAddress("13AF8D62809EA5C4F4FD9C645C36B6E4A8668111") || pv[0].MatchesAddress("4D099B4DB54FE78E537173934E7B656EB83E7FA5") {
+		t.Errorf("address prefix match broken: %+v", pv[0])
+	}
+	received := 0
+	for _, v := range pc {
+		if v.Received {
+			received++
+		}
+	}
+	if received != 1 {
+		t.Errorf("precommits received = %d, want 1", received)
+	}
+}
+
+func TestParseVotes(t *testing.T) {
+	votes := parseVotes([]string{
+		"nil-Vote",
+		"Vote{1:4D099B4DB54F 8/00/SIGNED_MSG_TYPE_PREVOTE(Prevote) 000000000000 40000901A2E8 000000000000 @ 2026-10-28T08:58:47Z}",
+		"something unexpected",
+	})
+	if votes[0].Received || !votes[1].Received || !votes[1].ForNil || votes[2].Received {
+		t.Fatalf("votes = %+v", votes)
+	}
+}

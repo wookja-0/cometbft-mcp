@@ -5,12 +5,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# name role rpc-port metrics-port
-NODES="sentry sentry 26657 26660
-val0 validator 26757 26760
-val1 validator 26857 26860
-val2 validator 26957 26960
-val3 validator 27057 27060"
+# name role rpc-port
+NODES="sentry sentry 26657
+val0 validator 26757
+val1 validator 26857
+val2 validator 26957
+val3 validator 27057"
 
 wait_for() {
   for _ in $(seq 1 90); do
@@ -27,12 +27,11 @@ wait_for() {
   echo "cosmos:"
   echo "  rest: http://127.0.0.1:1317   # the sentry's REST API"
   echo "nodes:"
-  while read -r name role rpc metrics; do
+  while read -r name role rpc; do
     wait_for "$rpc"
     echo "  - name: $name"
     echo "    role: $role"
     echo "    rpc: http://127.0.0.1:$rpc"
-    echo "    metrics: http://127.0.0.1:$metrics"
     if [[ "$role" == validator ]]; then
       addr=$(curl -fsS "http://127.0.0.1:$rpc/status" | jq -r .result.validator_info.address)
       echo "    validator_address: $addr"

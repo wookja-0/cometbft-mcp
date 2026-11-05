@@ -58,11 +58,11 @@ func toolNames(t *testing.T, cs *mcp.ClientSession) string {
 
 func TestUpgradeToolOnlyWithCosmos(t *testing.T) {
 	without, _ := session(t, false)
-	if got := toolNames(t, without); got != "fleet_overview,node_status,peer_health,validator_health" {
+	if got := toolNames(t, without); got != "consensus_diagnosis,fleet_overview,node_status,peer_health,validator_health" {
 		t.Fatalf("without cosmos: %s", got)
 	}
 	with, _ := session(t, true)
-	if got := toolNames(t, with); got != "fleet_overview,node_status,peer_health,upgrade_readiness,validator_health" {
+	if got := toolNames(t, with); got != "consensus_diagnosis,fleet_overview,node_status,peer_health,upgrade_readiness,validator_health" {
 		t.Fatalf("with cosmos: %s", got)
 	}
 }

@@ -2,7 +2,7 @@
 
 > A read-only MCP server for CometBFT node and validator operators.
 
-Ask your agent *"Is my validator signing?"*, *"How close is it to jail?"* or *"Are we ready for the upgrade?"* and get an answer grounded in your own nodes and the chain's own slashing state, judged the way an operator would judge them.
+Ask your agent *"Is my validator signing?"*, *"How close is it to jail?"*, *"Why did the chain stop?"* or *"Are we ready for the upgrade?"* and get an answer grounded in your own nodes and the chain's own slashing state, judged the way an operator would judge them.
 
 Real output from the bundled local network, with `val3` stopped:
 
@@ -15,19 +15,26 @@ upgrade_readiness  localnet-1 [ok]: upgrade <untrusted>v2-e2e</untrusted> at hei
                    in ~164d20h (9999969 blocks)
 ```
 
-(`<untrusted>` marks text that came from the chain — here, a governance proposal — so the agent treats it as data.)
+…and with `val2` and `val3` both stopped, so the chain halts:
+
+```
+consensus_diagnosis  height 115 round 0 (Prevote) for 60s [critical]: prevotes 50.1%,
+                     precommits 0.0% of power — no_quorum; not voting: val3, val2
+```
+
+(`<untrusted>` marks text that came from the chain — here, a governance proposal — so the agent treats it as data. The 50.1% is not a typo: `val2` had been slashed 1% for downtime earlier in the run.)
 
 Works with any CometBFT chain (Cosmos Hub, Osmosis, any Cosmos SDK chain and non-SDK CometBFT apps) and any MCP client (Claude Code, Claude Desktop, Cursor, …).
 
 > [!WARNING]
-> Early release (v0.2). The tool API may change.
+> Early release (v0.3). The tool API may change.
 
 ## Security model
 
 Validator operators should not have to trust an LLM with their infrastructure. So this server is built so that it **cannot** do damage, rather than promising it won't:
 
 - **No keys, ever.** The config has no field that can point at `priv_validator_key.json`, a keyring or a mnemonic, and fields that look like secrets are rejected by name. No code path reads the filesystem besides the config file.
-- **Read-only by construction.** Every request goes through one HTTP client that only issues `GET`s to a hard-coded allowlist: CometBFT `/status`, `/net_info`, `/validators`, `/commit`, `/abci_info`, `/health`, `/metrics`, and Cosmos SDK slashing, staking, upgrade and gov *queries*. `broadcast_*`, `unsafe_*`, `dial_*`, `check_tx` and `/cosmos/tx/` are explicitly denied, path parameters are pattern-checked, redirects are never followed, and responses are size-capped.
+- **Read-only by construction.** Every request goes through one HTTP client that only issues `GET`s to a hard-coded allowlist: CometBFT `/status`, `/net_info`, `/validators`, `/commit`, `/consensus_state`, `/abci_info`, `/health`, and Cosmos SDK slashing, staking, upgrade and gov *queries*. `broadcast_*`, `unsafe_*`, `dial_*`, `check_tx`, `/dump_consensus_state` (it lists peer addresses) and `/cosmos/tx/` are explicitly denied, path parameters are pattern-checked, redirects are never followed, and responses are size-capped.
 - **Network details are masked.** Peer IPs are reported only as a class (`private-ipv4`, `public-ipv4`, …), node IDs are truncated, and errors never carry an address, so a sentry-protected validator's IP does not end up in an LLM provider's logs. `--reveal-network` turns this off, explicitly.
 - **Node text is untrusted.** Monikers, versions and other node-controlled strings are wrapped in `<untrusted>` tags, truncated, and stripped of control characters, so a hostile peer cannot inject instructions into your agent.
 - **Gentle on nodes.** A global concurrency cap and bounded block scans; commits are read from sentries or full nodes first, not from the validator.
@@ -38,21 +45,28 @@ Details: [docs/security.md](docs/security.md).
 
 | Tool | Answers |
 |---|---|
-| `fleet_overview` | Everything at once: one line per node, one summary per validator, and the upgrade status. The starting point for "is everything ok?". |
+| `fleet_overview` | Everything at once: one line per node, one summary per validator, consensus and upgrade status. The starting point for "is everything ok?". |
 | `node_status` | Is each node synced? Height, seconds since the last block, `catching_up`, blocks behind the rest of the fleet, versions, and for validators the consensus address and voting power. |
 | `peer_health` | Is each node well connected? Peer count, inbound/outbound, peers on public addresses (a validator behind sentries should have none), peers on another chain. |
 | `validator_health` | Is the validator signing? Signed / nil / missed / not-in-set over the last N blocks, consecutive misses at the head, voting power, rank and share of the set. Works while the validator itself is down. With the Cosmos SDK layer: jailed / tombstoned / bonding status, the chain's own missed-block counter, **misses until downtime jail** and **time to jail** at the current rate. |
+| `consensus_diagnosis` | Why did blocks stop? The live round: height, round, step, time at this height, which validators' prevotes and precommits have arrived, and whether > 2/3 of power is voting. Tells **"not enough validators online" (and who)** apart from **"online but not committing"** (upgrade halt, app hash error). |
 | `upgrade_readiness` | Is an upgrade coming? The x/upgrade plan with ETA from the measured block time, upgrade proposals in voting, each node's app version, and whether the chain is halted at an upgrade height. *(Cosmos SDK layer only.)* |
 
-Every result has a `level` (`ok` / `warn` / `critical` / `unknown`) and `findings` with stable codes such as `not_signing`, `jail_imminent`, `time_to_jail`, `jailed`, `upgrade_soon`, `behind_fleet` or `validator_public_peers`.
+Every result has a `level` (`ok` / `warn` / `critical` / `unknown`) and `findings` with stable codes such as `not_signing`, `jail_imminent`, `time_to_jail`, `jailed`, `no_quorum`, `upgrade_soon`, `behind_fleet` or `validator_public_peers`.
 
 Two prompts package common workflows: **`daily_check`** (sweep, drill into what's flagged, report as an operator briefing) and **`incident_triage`** (evidence-first diagnosis of one node, ending with what to check on the host).
 
 ## Install
 
+Binary (Linux and macOS, amd64/arm64) from [Releases](https://github.com/wookja-0/cometbft-mcp/releases), with build-provenance attestations (`gh attestation verify <file> --repo wookja-0/cometbft-mcp`), or:
+
 ```bash
 go install github.com/wookja-0/cometbft-mcp/cmd/cometbft-mcp@latest
 ```
+
+Container (`ghcr.io/wookja-0/cometbft-mcp`, distroless, non-root): the only host access it needs is your config, mounted read-only — the strongest isolation option. See [Connect a client](#connect-a-client).
+
+Also listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.wookja-0/cometbft-mcp`.
 
 ## Configure
 
@@ -101,6 +115,23 @@ claude mcp add cometbft -- cometbft-mcp --config ~/.config/cometbft-mcp/config.y
 }
 ```
 
+**Container** — any client, same JSON shape:
+
+```json
+{
+  "mcpServers": {
+    "cometbft": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm",
+               "--mount", "type=bind,src=/Users/you/.config/cometbft-mcp/config.yaml,dst=/config/config.yaml,readonly",
+               "ghcr.io/wookja-0/cometbft-mcp:0.3.0"]
+    }
+  }
+}
+```
+
+Inside a container `127.0.0.1` is the container itself: point the config at `host.docker.internal` (Docker Desktop) or add `--network host` (Linux) to reach SSH tunnels on the host.
+
 ## Try it on a local network
 
 `localnet/` runs a 4-validator + 1-sentry [simd](https://github.com/cosmos/cosmos-sdk/tree/main/simapp) network in Docker, with `val0` behind the sentry and genesis tuned so that downtime shows up in seconds (50-block slashing window, 50% min signed, 60 s jail, 30 s governance voting). `make localnet-up` writes `localnet/config.yaml` with the freshly generated validator addresses.
@@ -112,6 +143,7 @@ claude mcp add cometbft-local -- $PWD/bin/cometbft-mcp --config $PWD/localnet/co
 
 make localnet-stop VAL=val3            # then ask: "is val3 signing? how long until it's jailed?"
 make localnet-start VAL=val3           # …and watch it recover (or leave it ~40 s and watch it get jailed)
+make localnet-stop VAL="val2 val3"     # halt the chain; wait a minute, then ask: "why did blocks stop?"
 make localnet-down                     # delete everything
 ```
 
@@ -134,8 +166,11 @@ With the Cosmos SDK layer it then reads the chain's own verdict inputs: `x/slash
 
 ## Roadmap
 
-- **v0.3** — `disk_forecast` from Prometheus, release binaries and a container image, MCP Registry listing
-- ICS consumer chains (slashing and jailing live on the provider), secp256k1 consensus keys
+- ICS consumer chains (slashing and jailing live on the provider)
+- secp256k1 consensus keys
+- Tendermint2 (Gno) adapter
+
+Host metrics (disk, memory) are out of scope on purpose: node_exporter and your existing alerting already cover them, and cometbft-mcp stays focused on judgments that need chain rules.
 
 ## Development
 
@@ -143,7 +178,7 @@ With the Cosmos SDK layer it then reads the chain's own verdict inputs: `x/slash
 make test         # unit tests, no network
 make lint
 make localnet-up
-make e2e          # MCP over stdio against the localnet: downtime, a real jail + unjail, an upgrade proposal (~4 min)
+make e2e          # MCP over stdio against the localnet: downtime, a real jail + unjail, an upgrade proposal, a chain halt (~5 min)
 ```
 
 Contributor notes and the invariants that must never break: [AGENTS.md](AGENTS.md).

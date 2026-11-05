@@ -134,7 +134,7 @@ func TestToolsAreReadOnly(t *testing.T) {
 			t.Errorf("%s is not annotated read-only", tool.Name)
 		}
 	}
-	if strings.Join(names, ",") != "fleet_overview,node_status,peer_health,upgrade_readiness,validator_health" {
+	if strings.Join(names, ",") != "consensus_diagnosis,fleet_overview,node_status,peer_health,upgrade_readiness,validator_health" {
 		t.Fatalf("tools = %v", names)
 	}
 }
@@ -306,4 +306,41 @@ func TestJailAndUnjail(t *testing.T) {
 			in != nil && in["in_set"] == true && r["miss_streak"].(float64) == 0 && r["last_signed_height"] != nil
 	})
 	t.Logf("val2 unjailed: %s", r["summary"])
+}
+
+func TestChainHalt(t *testing.T) {
+	s := connect(t)
+	// Two of four equal validators offline leaves 50% of power: no quorum.
+	compose(t, "stop", "val2", "val3")
+	stopped := true
+	t.Cleanup(func() {
+		if stopped {
+			compose(t, "start", "val2", "val3")
+		}
+	})
+
+	r := poll(t, s, 2*time.Minute, "consensus_diagnosis", nil, func(r map[string]any) bool {
+		return r["level"] == "critical"
+	})
+	t.Logf("halted: %s", r["summary"])
+	fs := r["findings"].([]any)[0].(map[string]any)
+	pv := r["prevotes"].(map[string]any)
+	if fs["code"] != "no_quorum" || pv["quorum"] != false || pv["missing"].(float64) != 2 {
+		t.Fatalf("diagnosis: %v", r)
+	}
+	if !strings.Contains(r["summary"].(string), "not voting: val2, val3") && !strings.Contains(r["summary"].(string), "not voting: val3, val2") {
+		t.Fatalf("summary should name val2 and val3: %s", r["summary"])
+	}
+
+	ov := call(t, s, "fleet_overview", nil)
+	if ov["level"] != "critical" || !strings.Contains(ov["summary"].(string), "no_quorum") {
+		t.Fatalf("overview: %s", ov["summary"])
+	}
+
+	compose(t, "start", "val2", "val3")
+	stopped = false
+	r = poll(t, s, 2*time.Minute, "consensus_diagnosis", nil, func(r map[string]any) bool {
+		return r["level"] == "ok"
+	})
+	t.Logf("recovered: %s", r["summary"])
 }

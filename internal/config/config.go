@@ -29,11 +29,9 @@ type Node struct {
 	Name             string `yaml:"name"`
 	Role             Role   `yaml:"role"`
 	RPC              string `yaml:"rpc"`
-	Metrics          string `yaml:"metrics,omitempty"`
 	ValidatorAddress string `yaml:"validator_address,omitempty"`
 
 	RPCURL       *url.URL `yaml:"-"`
-	MetricsURL   *url.URL `yaml:"-"`
 	ValidatorHex string   `yaml:"-"` // parsed ValidatorAddress, upper-case hex
 }
 
@@ -167,11 +165,6 @@ func (c *Config) validate() error {
 		var err error
 		if n.RPCURL, err = parseURL(n.RPC); err != nil {
 			return fmt.Errorf("%s: rpc: %w", where, err)
-		}
-		if n.Metrics != "" {
-			if n.MetricsURL, err = parseURL(n.Metrics); err != nil {
-				return fmt.Errorf("%s: metrics: %w", where, err)
-			}
 		}
 		if n.ValidatorAddress != "" {
 			if n.Role != RoleValidator {

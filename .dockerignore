@@ -1,0 +1,7 @@
+.git
+bin
+dist
+localnet
+test
+**/*_test.go
+**/testdata

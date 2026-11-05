@@ -7,7 +7,7 @@ cometbft-mcp sits between an LLM and production validator infrastructure. The de
 | Threat | Control | Where |
 |---|---|---|
 | Validator key theft, double-signing | No config field for key paths; secret-looking fields rejected by name; no filesystem reads besides the config | `internal/config` |
-| Agent changes node or chain state | One HTTP client; `GET` only; hard-coded path allowlist (CometBFT reads, Cosmos SDK slashing/staking/upgrade/gov queries) that code outside the package cannot extend; `broadcast_*`, `unsafe_*`, `dial_*`, `check_tx`, `/cosmos/tx/` denied even if added to the allowlist; per-endpoint query-parameter allowlist; path parameters (consensus addresses) must match `^[a-z0-9]{1,90}$`, so no traversal or injection; no redirects | `internal/safehttp` |
+| Agent changes node or chain state | One HTTP client; `GET` only; hard-coded path allowlist (CometBFT reads, Cosmos SDK slashing/staking/upgrade/gov queries) that code outside the package cannot extend; `broadcast_*`, `unsafe_*`, `dial_*`, `check_tx`, `/dump_consensus_state` (lists peer addresses), `/cosmos/tx/` denied even if added to the allowlist; per-endpoint query-parameter allowlist; path parameters (consensus addresses) must match `^[a-z0-9]{1,90}$`, so no traversal or injection; no redirects | `internal/safehttp` |
 | Validator IP exposed to the LLM provider | Peer IPs reduced to an address class, node IDs truncated, listen addresses masked, transport errors (which name the address) replaced by codes; opt-out only via `--reveal-network` | `internal/sanitize`, `internal/fleet` |
 | REST endpoint on the wrong chain | The REST node's chain ID is checked against the nodes' before any slashing or upgrade judgment (`rest_wrong_chain`) | `internal/fleet` |
 | Prompt injection through monikers, versions, app names, upgrade plans, proposal titles | Wrapped in `<untrusted>…</untrusted>`; embedded envelope tags neutralized; control and format characters removed; truncated to 128 runes | `internal/sanitize` |
@@ -18,7 +18,7 @@ cometbft-mcp sits between an LLM and production validator infrastructure. The de
 
 - **The MCP client and LLM provider.** Masked output still describes your topology (node names, roles, heights, peer counts). Get your organization's approval before pointing this at production.
 - **`structuredContent` consumers.** The `<untrusted>` envelope is inside the JSON strings; a client that renders them is responsible for its own presentation.
-- **A compromised binary.** Install from source or verify release checksums. Running the container image (planned, v0.3) adds filesystem isolation on top of the code-level guarantees.
+- **A compromised binary.** Release archives and images carry GitHub build-provenance attestations (`gh attestation verify`); all CI actions are pinned by commit SHA. Running the container image adds filesystem isolation on top of the code-level guarantees: it sees only the read-only config mount.
 
 ## Reporting
 

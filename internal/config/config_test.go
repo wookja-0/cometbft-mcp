@@ -12,7 +12,6 @@ nodes:
   - name: val-1
     role: validator
     rpc: http://127.0.0.1:26757
-    metrics: http://127.0.0.1:26760
     validator_address: cosmosvalcons13x3ggf902z07z2n7mue4enjjruzu3s25368anl
   - name: sentry-1
     role: sentry
@@ -31,8 +30,8 @@ func TestParseValid(t *testing.T) {
 	if v.ValidatorHex != "89A28424AF509FE12A7EDF335CCE521F05C8C154" {
 		t.Fatalf("validator hex = %q", v.ValidatorHex)
 	}
-	if v.RPCURL.Host != "127.0.0.1:26757" || v.MetricsURL == nil {
-		t.Fatalf("urls = %v %v", v.RPCURL, v.MetricsURL)
+	if v.RPCURL.Host != "127.0.0.1:26757" {
+		t.Fatalf("rpc = %v", v.RPCURL)
 	}
 	if c.Cosmos == nil || c.Cosmos.RESTURL.Host != "127.0.0.1:1317" {
 		t.Fatalf("cosmos = %+v", c.Cosmos)

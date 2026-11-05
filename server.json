@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.wookja-0/cometbft-mcp",
+  "title": "CometBFT validator ops",
+  "description": "Read-only health, jail-risk, halt and upgrade checks for CometBFT validators and nodes",
+  "version": "0.3.0",
+  "repository": {
+    "url": "https://github.com/wookja-0/cometbft-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/wookja-0/cometbft-mcp:0.3.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--mount",
+          "description": "Mount your cometbft-mcp config.yaml (node RPC URLs, optional Cosmos REST URL) read-only into the container",
+          "value": "type=bind,src={config_path},dst=/config/config.yaml,readonly",
+          "isRequired": true,
+          "variables": {
+            "config_path": {
+              "description": "Absolute path to config.yaml on the host",
+              "format": "filepath",
+              "isRequired": true
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

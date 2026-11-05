@@ -57,7 +57,7 @@ func TestDeniedPathsAreRejectedBeforeAnyRequest(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Options{})
-	for _, p := range []string{"/cosmos/tx/v1beta1/txs", "/broadcast_tx_sync", "/broadcast_tx_commit", "/broadcast_evidence", "/unsafe_flush_mempool", "/dial_peers", "/dial_seeds", "/check_tx", "/abci_query", "/genesis"} {
+	for _, p := range []string{"/cosmos/tx/v1beta1/txs", "/broadcast_tx_sync", "/broadcast_tx_commit", "/broadcast_evidence", "/unsafe_flush_mempool", "/dial_peers", "/dial_seeds", "/check_tx", "/abci_query", "/genesis", "/dump_consensus_state", "/metrics"} {
 		// Constructing an Endpoint by hand is only possible inside this
 		// package; it simulates a future allowlist mistake.
 		_, err := c.Get(context.Background(), mustURL(t, srv.URL), Endpoint{path: p}, nil)

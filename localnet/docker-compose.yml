@@ -3,10 +3,9 @@
 #   make localnet-up      build image, init once, start
 #   make localnet-down    stop and delete all chain data
 #
-# Host ports (RPC / Prometheus metrics):
-#   sentry 26657 / 26660   (+ REST 1317)
-#   val0   26757 / 26760   val1 26857 / 26860
-#   val2   26957 / 26960   val3 27057 / 27060
+# Host ports (CometBFT RPC):
+#   sentry 26657 (+ REST 1317)
+#   val0 26757   val1 26857   val2 26957   val3 27057
 
 x-node: &node
   image: cometbft-mcp/simd:v0.54.4
@@ -30,31 +29,31 @@ services:
     <<: *node
     command: ["simd", "start", "--home", "/data/sentry/simd"]
     networks: { localnet: { ipv4_address: 172.30.0.20 } }
-    ports: ["26657:26657", "26660:26660", "1317:1317"]
+    ports: ["26657:26657", "1317:1317"]
 
   val0:
     <<: *node
     command: ["simd", "start", "--home", "/data/node0/simd"]
     networks: { localnet: { ipv4_address: 172.30.0.10 } }
-    ports: ["26757:26657", "26760:26660"]
+    ports: ["26757:26657"]
 
   val1:
     <<: *node
     command: ["simd", "start", "--home", "/data/node1/simd"]
     networks: { localnet: { ipv4_address: 172.30.0.11 } }
-    ports: ["26857:26657", "26860:26660"]
+    ports: ["26857:26657"]
 
   val2:
     <<: *node
     command: ["simd", "start", "--home", "/data/node2/simd"]
     networks: { localnet: { ipv4_address: 172.30.0.12 } }
-    ports: ["26957:26657", "26960:26660"]
+    ports: ["26957:26657"]
 
   val3:
     <<: *node
     command: ["simd", "start", "--home", "/data/node3/simd"]
     networks: { localnet: { ipv4_address: 172.30.0.13 } }
-    ports: ["27057:26657", "27060:26660"]
+    ports: ["27057:26657"]
 
 networks:
   localnet:
