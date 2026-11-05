@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="cometbft-mcp icon: a comet whose tail is a trail of signed blocks, one of them missed">
+<rect width="512" height="512" fill="#0C1014"></rect>
+<circle cx="362" cy="150" r="60" fill="#4BE3A0"></circle>
+<rect x="254" y="206" width="52" height="52" rx="8" fill="#E8EDF2"></rect>
+<rect x="197" y="273" width="42" height="42" rx="7" fill="#E8EDF2" fill-opacity="0.75"></rect>
+<rect x="151.5" y="331.5" width="29" height="29" rx="5" fill="none" stroke="#E8EDF2" stroke-opacity="0.75" stroke-width="5"></rect>
+<rect x="111" y="375" width="26" height="26" rx="5" fill="#E8EDF2" fill-opacity="0.45"></rect>
+<rect x="80" y="412" width="20" height="20" rx="4" fill="#E8EDF2" fill-opacity="0.28"></rect>
+</svg>
