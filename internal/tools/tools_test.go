@@ -180,10 +180,10 @@ func TestUnconfiguredServerListsToolsAndExplainsSetup(t *testing.T) {
 	}
 	defer cs.Close()
 
-	if got := toolNames(t, cs); got != "consensus_diagnosis,fleet_overview,node_status,peer_health,validator_health" {
+	if got := toolNames(t, cs); got != "consensus_diagnosis,fleet_overview,node_status,peer_health,upgrade_readiness,validator_health" {
 		t.Fatalf("tools = %s", got)
 	}
-	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "validator_health", Arguments: map[string]any{}})
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{Name: "upgrade_readiness", Arguments: map[string]any{}})
 	if err != nil {
 		t.Fatal(err)
 	}

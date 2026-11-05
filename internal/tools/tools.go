@@ -40,10 +40,11 @@ func Register(s *mcp.Server, f *fleet.Fleet, cfg *config.Config) {
 }
 
 // RegisterUnconfigured adds the tools for a server that has no usable
-// config: they are listed (so clients and directories can see what the
-// server offers) and every call explains how to set it up.
+// config: every tool is listed, upgrade_readiness included, so clients and
+// directories see the full surface, and every call explains how to set it
+// up. (No tool can succeed here, so listing them all hides nothing.)
 func RegisterUnconfigured(s *mcp.Server, setupErr error) {
-	register(s, false, func() (*fleet.Fleet, error) { return nil, setupErr })
+	register(s, true, func() (*fleet.Fleet, error) { return nil, setupErr })
 }
 
 func register(s *mcp.Server, cosmos bool, get func() (*fleet.Fleet, error)) {
