@@ -349,7 +349,7 @@ Findings: `no_quorum` (names who is not voting), `stuck_with_quorum`, `many_roun
 <details>
 <summary><b><code>upgrade_readiness</code></b> — is an upgrade coming? <i>(needs <code>cosmos.rest</code>)</i></summary>
 
-The `x/upgrade` plan (name, height, blocks remaining, ETA), software-upgrade proposals in their voting period, and each node's app and CometBFT version. Registered only when `cosmos.rest` is configured. It cannot see whether the new binary is staged on each host, and says so.
+The `x/upgrade` plan (name, height, blocks remaining, ETA), software-upgrade proposals in their voting period, and each node's app and CometBFT version. Registered only when `cosmos.rest` is configured (or when the server has no config yet, so directories list every tool). It cannot see whether the new binary is staged on each host, and says so.
 
 No arguments.
 
