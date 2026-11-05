@@ -3,7 +3,7 @@ one of them down (coral), with a pulse line through the middle — the
 question the server answers: who is not signing? It sits on a dark disc over
 the indigo-to-teal gradient used by the README demo.
 
-    python3 docs/brand/logo.py docs/brand/logo.png      (needs Pillow)
+    python3 docs/brand/logo.py docs/brand/logo.png docs/brand/mark.png      (needs Pillow)
 
 draw_mark() is shared with social.py.
 """
@@ -70,8 +70,19 @@ def draw_mark(img, cx, cy, k):
 
 
 if __name__ == "__main__":
+    # logo.py [square.png] [mark.png]: the square icon (directories, avatars)
+    # and the round mark on a transparent background (README header).
     out = sys.argv[1] if len(sys.argv) > 1 else "logo.png"
     S = 2048                                # draw large, downsample for smooth edges
     img = draw_mark(gradient(S, S), S / 2, S / 2, S)
     img.convert("RGB").resize((512, 512), Image.LANCZOS).save(out, optimize=True)
     print("wrote", out)
+    if len(sys.argv) > 2:
+        mark = draw_mark(Image.new("RGBA", (S, S), (0, 0, 0, 0)), S / 2, S / 2, S)
+        # A thin teal rim keeps the disc's edge visible on dark backgrounds.
+        P, rim = S * 0.40, S * 0.012
+        ImageDraw.Draw(mark).ellipse([S / 2 - P, S / 2 - P, S / 2 + P, S / 2 + P], outline=(45, 212, 191, 170), width=round(rim))
+        m = S * 0.07                        # trim to the plate plus its shadow
+        mark = mark.crop((round(m), round(m), round(S - m), round(S - m + S * 0.02)))
+        mark.resize((512, round(512 * mark.height / mark.width)), Image.LANCZOS).save(sys.argv[2], optimize=True)
+        print("wrote", sys.argv[2])
