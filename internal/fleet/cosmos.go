@@ -43,7 +43,7 @@ const noSlashingModule = "this chain has no x/slashing module (an ICS consumer c
 // cosmosValidator gathers the SDK view of the validator with consensus
 // address hexAddr. Failures are reported inside the result, not as an error,
 // so the liveness part of the report still stands.
-func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, height int64, streak int, blockTime time.Duration) (*CosmosValidator, []analysis.Finding) {
+func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, height int64, streak int, blockTime time.Duration, outOfSet bool) (*CosmosValidator, []analysis.Finding) {
 	cv := &CosmosValidator{}
 	fail := func(err error) (*CosmosValidator, []analysis.Finding) {
 		cv.Error = f.nodeError(err)
@@ -83,8 +83,13 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 		return fail(&cosmos.Error{Code: cosmos.CodeBadResponse, Detail: err.Error()})
 	}
 
-	// Staking status is best-effort: without it the slashing judgment still holds.
-	if vals, err := f.cosmos.Validators(ctx); err == nil {
+	// Staking status is best-effort: without it the slashing judgment still
+	// holds, and the CometBFT set stands in for the bonded status.
+	var stakingFs []analysis.Finding
+	if vals, err := f.cosmos.Validators(ctx); err != nil {
+		stakingFs = append(stakingFs, analysis.Finding{Level: analysis.OK, Code: "staking_unavailable",
+			Message: "could not read x/staking (" + f.nodeError(err).Error() + "): status, operator address and moniker are missing; whether it is bonded comes from the CometBFT validator set instead"})
+	} else {
 		for _, v := range vals {
 			if a, err := address.ConsensusFromPubKey(v.ConsensusPubkey.Type, v.ConsensusPubkey.Key); err == nil && a == hexAddr {
 				cv.OperatorAddress = bech32Addr(v.OperatorAddress)
@@ -99,7 +104,7 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 	info, err := f.cosmos.SigningInfo(ctx, cv.ConsensusAddress)
 	if err != nil {
 		if ne := f.nodeError(err); ne.Code == cosmos.CodeNotFound {
-			return cv, []analysis.Finding{{Level: analysis.Warn, Code: "no_signing_info", Message: "the chain has no signing info for this consensus address: the validator never bonded, or validator_address is wrong"}}
+			return cv, append(stakingFs, analysis.Finding{Level: analysis.Warn, Code: "no_signing_info", Message: "the chain has no signing info for this consensus address: the validator never bonded, or validator_address is wrong"})
 		}
 		return fail(err)
 	}
@@ -126,6 +131,7 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 		JailedUntil: info.JailedUntil,
 		Tombstoned:  info.Tombstoned,
 		Status:      cv.Status,
+		OutOfSet:    outOfSet,
 		MissStreak:  streak,
 		BlockTime:   blockTime,
 	})
@@ -136,7 +142,7 @@ func (f *Fleet) cosmosValidator(ctx context.Context, hexAddr, chainID string, he
 			cv.TimeToJail = view.TimeToJail.Round(time.Second).String()
 		}
 	}
-	return cv, fs
+	return cv, append(fs, stakingFs...)
 }
 
 // bondStatus passes x/staking's enum through and wraps anything else.

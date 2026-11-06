@@ -49,7 +49,8 @@ type Slashing struct {
 	Jailed      bool
 	JailedUntil time.Time
 	Tombstoned  bool
-	Status      string // BOND_STATUS_*
+	Status      string // BOND_STATUS_*; empty if the staking lookup failed
+	OutOfSet    bool   // not in the current CometBFT validator set; decides when Status is empty
 	MissStreak  int    // consecutive misses at the head, from liveness
 	BlockTime   time.Duration
 }
@@ -85,6 +86,12 @@ func JudgeSlashing(s Slashing) (SlashingView, []Finding) {
 	if s.Status != "" && s.Status != "BOND_STATUS_BONDED" {
 		v.Untracked = true
 		return v, append(fs, Finding{Warn, "not_bonded", fmt.Sprintf("staking status is %s: not in the active set (not jailed, so most likely too little stake); no downtime jail risk while out of the set", bondStatus(s.Status))})
+	}
+	// Without a staking status the CometBFT set is the same fact: the votes
+	// x/slashing handles are that set's. Liveness already reports the absence.
+	if s.Status == "" && s.OutOfSet {
+		v.Untracked = true
+		return v, fs
 	}
 
 	v.MissesUntilJail = max(s.MaxMissed-s.Missed, 0)

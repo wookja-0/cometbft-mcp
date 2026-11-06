@@ -250,6 +250,43 @@ func TestNoSigningInfo(t *testing.T) {
 	}
 }
 
+// Seen on Neutron through a rate-limited public REST API: the staking list
+// failed, so the report had no status and said nothing about it. Now it says
+// so, and the CometBFT set decides whether there is a jail margin.
+func TestStakingFailureIsReportedAndSetDecidesTheMargin(t *testing.T) {
+	d, other := newTestValidator(t), newTestValidator(t)
+	fc := &fakeChain{
+		height: 60,
+		set: func(h int64) []string {
+			if h > 50 {
+				return []string{other.hex} // d left the set
+			}
+			return []string{other.hex, d.hex}
+		},
+		flag:  allSigned,
+		nodes: map[string]*fakeNode{"sentry": {}},
+		rest: &fakeREST{
+			network: "testchain-1",
+			signing: map[string]map[string]any{d.valcons: signingInfo(1, 3, epoch)},
+			absent:  []string{"/cosmos/staking/"},
+		},
+	}
+	f := newFleet(t, fc, []config.Node{{Name: "sentry", Role: config.RoleSentry}, {Name: "v", Role: config.RoleValidator, ValidatorAddress: d.hex}}, false)
+	r, err := f.Validator(context.Background(), "v", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Cosmos.MissesUntilJail != nil || r.Cosmos.Status != "" {
+		t.Fatalf("cosmos = %+v", r.Cosmos)
+	}
+	if codesOf(r.Findings)["staking_unavailable"] != analysis.OK {
+		t.Fatalf("findings = %v", r.Findings)
+	}
+	if strings.Contains(r.Summary, "until downtime jail") {
+		t.Fatalf("summary = %s", r.Summary)
+	}
+}
+
 // ICS consumer chains (Stride, for example) have no x/slashing or x/staking:
 // the REST API answers 501 Not Implemented, and the validator is judged on
 // liveness alone rather than reported unknown forever.

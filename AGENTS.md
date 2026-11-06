@@ -50,7 +50,7 @@ go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 11 mainnets
 - Test first. Unit tests use the fake chain in `internal/fleet/fleet_test.go` or fixtures; anything that depends on real node behavior gets an e2e test.
 - Judgments go in `analysis` with a stable finding `code`, a level, and a message that states the threshold it used.
 - Chain rules that `analysis` reimplements (e.g. `MaxMissed`) must match the SDK source exactly and cite it in a comment.
-- Tools that need optional config (e.g. `upgrade_readiness` needs `cosmos.rest`) are registered only when it is present, and prompts must not mention unregistered tools. Exception: with no usable config, every tool is listed (each call returns the setup guidance) so directories show the full surface.
+- Tools that need optional config (e.g. `upgrade_readiness` needs `cosmos.rest`) are registered only when it is present, and prompts must not mention unregistered tools. Exception: with no usable config, every tool and prompt is listed (each call returns the setup guidance) so directories show the full surface.
 - Tool descriptions say what / when / returns / NOT, and stay under 2,048 characters (`internal/tools/tools_test.go`).
 - Conventional commits.
 

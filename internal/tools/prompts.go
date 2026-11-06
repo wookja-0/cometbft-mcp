@@ -10,12 +10,22 @@ import (
 	"github.com/wookja-0/cometbft-mcp/internal/config"
 )
 
-func registerPrompts(s *mcp.Server, cfg *config.Config) {
+// registerPrompts adds the prompts. Without a usable config (cfg nil) they
+// are still listed, like the tools, and getting one returns setupErr.
+func registerPrompts(s *mcp.Server, cfg *config.Config, setupErr error) {
+	nodeDesc := "Node name from the config."
+	if cfg != nil {
+		nodeDesc = "Node name from the config: " + strings.Join(cfg.Names(), ", ")
+	}
+
 	s.AddPrompt(&mcp.Prompt{
 		Name:        "daily_check",
 		Title:       "Daily validator check",
 		Description: "Routine health check of every node and validator, reported as a short operator briefing.",
 	}, func(context.Context, *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		if setupErr != nil {
+			return nil, setupErr
+		}
 		return userPrompt("Daily validator check", dailyCheck(cfg)), nil
 	})
 
@@ -24,10 +34,13 @@ func registerPrompts(s *mcp.Server, cfg *config.Config) {
 		Title:       "Incident triage",
 		Description: "Structured diagnosis of a node or validator problem: gather evidence with the tools, rank likely causes, and list what the operator should check on the host.",
 		Arguments: []*mcp.PromptArgument{
-			{Name: "node", Description: "Node name from the config: " + strings.Join(cfg.Names(), ", "), Required: true},
+			{Name: "node", Description: nodeDesc, Required: true},
 			{Name: "symptom", Description: "What was observed, e.g. \"missed blocks alert\" or \"node stuck at height 1234\"."},
 		},
 	}, func(_ context.Context, req *mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
+		if setupErr != nil {
+			return nil, setupErr
+		}
 		name := req.Params.Arguments["node"]
 		n, ok := cfg.Node(name)
 		if !ok {

@@ -42,7 +42,8 @@ nodes:
   #   validator_address: cosmosvalcons1...
 
   # A public RPC also works for read-only checks of chain state; consider
-  # --concurrency 8 for remote endpoints.
+  # --concurrency 8 for remote endpoints, or less for rate-limited ones
+  # (HTTP 429: blocks they refuse are counted as unreadable).
   # - name: public-rpc
   #   role: full
   #   rpc: https://rpc.example.com:443

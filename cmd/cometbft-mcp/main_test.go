@@ -52,3 +52,14 @@ func TestSetupErrorInlineNeverEchoesContent(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// Flags go after the subcommand; anything left over is a mistake, not a
+// reason to start serving MCP on a terminal and wait on stdin.
+func TestStrayArgumentsAreRejected(t *testing.T) {
+	for _, args := range [][]string{{"--config", "x.yaml", "check"}, {"chek"}} {
+		err := run(args)
+		if err == nil || !strings.Contains(err.Error(), "unexpected argument") {
+			t.Fatalf("run(%q) = %v", args, err)
+		}
+	}
+}

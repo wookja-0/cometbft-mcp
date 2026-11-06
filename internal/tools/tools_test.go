@@ -191,6 +191,23 @@ func TestUnconfiguredServerListsToolsAndExplainsSetup(t *testing.T) {
 	if !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "no config file") {
 		t.Fatalf("result = %+v", res.Content)
 	}
+
+	// Prompts are listed too, and getting one explains the setup.
+	prompts, err := cs.ListPrompts(context.Background(), nil)
+	if err != nil || len(prompts.Prompts) != 2 {
+		t.Fatalf("prompts = %+v, %v", prompts, err)
+	}
+	for _, p := range prompts.Prompts {
+		for _, a := range p.Arguments {
+			if strings.Contains(a.Description, "from the config: ") {
+				t.Fatalf("%s.%s lists config names without a config: %q", p.Name, a.Name, a.Description)
+			}
+		}
+	}
+	_, err = cs.GetPrompt(context.Background(), &mcp.GetPromptParams{Name: "incident_triage", Arguments: map[string]string{"node": "val-1"}})
+	if err == nil || !strings.Contains(err.Error(), "no config file") {
+		t.Fatalf("get prompt err = %v", err)
+	}
 }
 
 func TestConsensusNodeArgumentIsDescribedForOneNode(t *testing.T) {

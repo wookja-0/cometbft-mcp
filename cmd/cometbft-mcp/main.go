@@ -67,6 +67,9 @@ func run(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("unexpected argument %q: subcommands (check, version) come before flags", fs.Arg(0))
+	}
 
 	if *concurrency < 1 || *concurrency > 32 {
 		return fmt.Errorf("--concurrency must be between 1 and 32")
