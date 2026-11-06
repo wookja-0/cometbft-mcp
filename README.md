@@ -286,7 +286,7 @@ There is deliberately no place for keys, mnemonics or tokens; fields that look l
 
 `cometbft-mcp check` prints a `node_status` report locally, without an MCP client, to verify a config.
 
-Without a usable config the server still starts: its tools stay listed and each call explains what to create (it never echoes the config's contents, which may hold internal addresses). Fix the file and restart the MCP server.
+Without a usable config the server still starts: its tools and prompts stay listed, and each call explains what to create, ending with a one-line public Cosmos Hub config to try first (it never echoes the config's contents, which may hold internal addresses). Fix the config and restart the MCP server.
 
 ## Tools
 
@@ -327,14 +327,14 @@ Findings: `no_peers`, `few_peers`, `no_outbound_peers`, `not_listening`, `valida
 <details>
 <summary><b><code>validator_health</code></b> — is the validator signing? how far from jail?</summary>
 
-Signed / nil-vote / missed / not-in-set over the last N canonical blocks, consecutive misses at the head, last signed height, voting power, rank and share of the set, average block time. With `cosmos.rest`: jailed / tombstoned / bonding status, the chain's missed-block counter, `max_missed`, `misses_until_jail`, and `time_to_jail` when the validator is not signing right now.
+Signed / nil-vote / missed / not-in-set over the last N canonical blocks, consecutive misses at the head, last signed height, voting power, rank and share of the set, average block time. Blocks the node could not serve are counted as unreadable and make the result `unknown`. With `cosmos.rest`: jailed / tombstoned / bonding status, the chain's missed-block counter, `max_missed`, `misses_until_jail`, and `time_to_jail` when the validator is not signing right now. A validator outside the bonded set gets no jail margin, and on a chain without `x/slashing` (an ICS consumer) it is judged on liveness alone.
 
 | Argument | |
 |---|---|
 | `node` | Validator name; optional when only one validator is configured |
 | `window` | Blocks to scan, 10–500 (default 100) |
 
-Findings: `not_signing`, `missed_blocks`, `left_active_set`, `not_in_active_set`, `partial_data`, `no_data`; with Cosmos: `jail_risk`, `jail_imminent`, `time_to_jail`, `jailed`, `tombstoned`, `not_bonded`, `jail_after_grace`, `no_signing_info`, `cosmos_unavailable`.
+Findings: `not_signing`, `missed_blocks`, `left_active_set`, `not_in_active_set`, `partial_data`, `no_data`; with Cosmos: `jail_risk`, `jail_imminent`, `time_to_jail`, `jailed`, `tombstoned`, `not_bonded`, `jail_after_grace`, `no_signing_info`, `no_slashing_module`, `staking_unavailable` (status and moniker missing; the CometBFT set decides the margin), `cosmos_unavailable`.
 </details>
 
 <details>
@@ -356,7 +356,7 @@ The `x/upgrade` plan (name, height, blocks remaining, ETA), software-upgrade pro
 
 No arguments.
 
-Findings: `upgrade_soon`, `upgrade_height_reached`, `upgrade_halt`, `version_skew`, `plan_unavailable`, `proposals_unavailable`.
+Findings: `upgrade_soon`, `upgrade_height_reached`, `upgrade_halt`, `version_skew`, `plan_unavailable`, `proposals_unavailable`, `no_gov_v1` (no governance module, as on authority-run chains: only the plan is checked).
 </details>
 
 **Prompts:** `daily_check` (sweep, drill into what is flagged, report as an operator briefing) and `incident_triage` (arguments `node`, optional `symptom`: evidence-first diagnosis ending with what to check on the host).
@@ -378,7 +378,7 @@ Threat model and reporting: [SECURITY.md](SECURITY.md).
 
 **Liveness.** A CometBFT commit lists every validator in the set at that height, in voting-power order, but **absent signatures carry no address**. So the tool looks for the validator's address in each commit; when it is not there, it reads the validator set at that height and the signature at the validator's index: absent means *missed*, no index means *not in the set*. It scans canonical commits only, up to `latest − 1`: the commit a node returns for the newest height is its *seen commit*, holding only the precommits that arrived before +2/3, where a validator behind a sentry routinely looks absent. Canonical commits are also what downtime slashing counts.
 
-**Jail risk.** With the Cosmos SDK layer it reads the chain's own inputs — `x/slashing` params and signing info, and `x/staking` matched by consensus key — and computes the threshold exactly as `x/slashing` does: `window − round_half_even(window × min_signed_per_window)`, including the grace period before `start_height + window`. A future `jailed_until` counts as jailed even if the staking lookup fails, because jailing resets the miss counter and would otherwise look like a clean record.
+**Jail risk.** With the Cosmos SDK layer it reads the chain's own inputs — `x/slashing` params and signing info, and `x/staking` matched by consensus key — and computes the threshold exactly as `x/slashing` does: `window − round_half_even(window × min_signed_per_window)`, including the grace period before `start_height + window`. A future `jailed_until` counts as jailed even if the staking lookup fails, because jailing resets the miss counter and would otherwise look like a clean record. `x/slashing` only counts the bonded set, so a validator outside it has no margin and no time to jail.
 
 **Halts.** CometBFT needs more than 2/3 of voting power to prevote and precommit. `consensus_diagnosis` reads the current round's votes (CometBFT also lists the next round, still empty, which is skipped), checks each vote against the validator at its position, and sums the power that has voted.
 

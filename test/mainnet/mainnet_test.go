@@ -16,6 +16,7 @@ package mainnet
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -162,8 +163,19 @@ func checkChain(t *testing.T, c *chain, cfg *config.Config, noSlashing bool) {
 			if cv["unsupported"] == nil || v["level"] == "unknown" {
 				t.Errorf("%s: a chain without x/slashing should be judged on liveness alone: %v %v", n.Name, v["level"], cv)
 			}
-		case cv["error"] != nil || cv["operator_address"] == nil || cv["max_missed"] == nil:
+		case strings.Contains(fmt.Sprint(cv["error"]), "HTTP 429"):
+			// The public endpoint's rate limit, reported as such: not verified.
+			t.Logf("note: %s: cosmos view not verified, REST rate-limited: %v", n.Name, cv["error"])
+		case cv["error"] != nil || cv["max_missed"] == nil:
 			t.Errorf("%s: cosmos view: %v", n.Name, cv)
+		case cv["operator_address"] == nil:
+			// A rate-limited public REST API can refuse the staking list; the
+			// report must say so rather than drop it silently.
+			if !strings.Contains(fmt.Sprint(v["findings"]), "staking_unavailable") {
+				t.Errorf("%s: staking view missing without a finding: %v", n.Name, cv)
+			} else {
+				t.Logf("note: %s: staking list unavailable (rate limit?)", n.Name)
+			}
 		case n.Name == "jailed" && cv["jailed"] != true:
 			t.Logf("note: the jailed validator's state has changed: %v", cv)
 		}

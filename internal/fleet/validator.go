@@ -139,7 +139,8 @@ func (f *Fleet) Validator(ctx context.Context, name string, window int) (*Valida
 		r.AvgBlockSeconds = roundTo(blockTime.Seconds(), 2)
 	}
 	if f.cosmos != nil {
-		cv, fs := f.cosmosValidator(ctx, addr, st.NodeInfo.Network, latest, l.MissStreak, blockTime)
+		outOfSet := r.ActiveSet != nil && !r.ActiveSet.InSet
+		cv, fs := f.cosmosValidator(ctx, addr, st.NodeInfo.Network, latest, l.MissStreak, blockTime, outOfSet)
 		r.Cosmos = cv
 		r.Findings = append(r.Findings, fs...)
 		r.Note = validatorNoteCosmos

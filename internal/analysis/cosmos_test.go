@@ -124,6 +124,22 @@ func TestJudgeSlashingNotBonded(t *testing.T) {
 	}
 }
 
+// Without a staking status (the lookup failed), the CometBFT validator set
+// decides: out of it, x/slashing does not count the validator either.
+func TestJudgeSlashingOutOfSetWithoutStakingStatus(t *testing.T) {
+	s := base()
+	s.Status, s.OutOfSet, s.Missed, s.MissStreak = "", true, 24, 20
+	v, fs := JudgeSlashing(s)
+	if !v.Untracked || v.TimeToJail != 0 || len(fs) != 0 {
+		t.Fatalf("view = %+v, findings = %v", v, codes(fs))
+	}
+	// A known staking status wins over the set (it is the chain's own view).
+	s.Status = "BOND_STATUS_BONDED"
+	if v, _ := JudgeSlashing(s); v.Untracked {
+		t.Fatalf("view = %+v", v)
+	}
+}
+
 func TestJudgeUpgrade(t *testing.T) {
 	u := Upgrade{Now: t0, Height: 1000, HeadTime: t0.Add(-2 * time.Second), BlockTime: 6 * time.Second, PlanName: "<untrusted>v2</untrusted>", StaleAfter: time.Minute}
 
