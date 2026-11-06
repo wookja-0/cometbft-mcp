@@ -221,7 +221,7 @@ args = ["--config", "/Users/you/.config/cometbft-mcp/config.yaml"]
       "command": "docker",
       "args": ["run", "-i", "--rm",
                "--mount", "type=bind,src=/Users/you/.config/cometbft-mcp/config.yaml,dst=/config/config.yaml,readonly",
-               "ghcr.io/wookja-0/cometbft-mcp:0.4.4"]
+               "ghcr.io/wookja-0/cometbft-mcp:0.4.5"]
     }
   }
 }
