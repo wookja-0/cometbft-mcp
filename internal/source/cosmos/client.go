@@ -7,6 +7,7 @@ package cosmos
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -22,6 +23,9 @@ const (
 	CodeBadResponse = "rest_bad_response"
 	CodeNotFound    = "rest_not_found"
 	CodeRESTError   = "rest_error"
+	// CodeUnimplemented is gRPC Unimplemented (HTTP 501): the chain does not
+	// have the module behind the endpoint, e.g. x/slashing on an ICS consumer.
+	CodeUnimplemented = "rest_unimplemented"
 )
 
 type Error struct {
@@ -30,6 +34,12 @@ type Error struct {
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Detail }
+
+// IsUnimplemented reports whether err says the chain lacks the endpoint's module.
+func IsUnimplemented(err error) bool {
+	var e *Error
+	return errors.As(err, &e) && e.Code == CodeUnimplemented
+}
 
 type Int64 = jsonnum.Int64
 
@@ -234,8 +244,11 @@ func (c *Client) get(ctx context.Context, e safehttp.Endpoint, segment string, q
 	}
 	if json.Unmarshal(body, &gwErr) == nil && gwErr.Code != nil && *gwErr.Code != 0 {
 		detail := sanitize.Untrusted(gwErr.Message) // the server chose this text
-		if *gwErr.Code == 5 {                       // gRPC NotFound
+		switch *gwErr.Code {
+		case 5: // gRPC NotFound
 			return &Error{Code: CodeNotFound, Detail: detail}
+		case 12: // gRPC Unimplemented
+			return &Error{Code: CodeUnimplemented, Detail: detail}
 		}
 		return &Error{Code: CodeRESTError, Detail: detail}
 	}

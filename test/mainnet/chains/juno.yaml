@@ -1,0 +1,17 @@
+# juno: validators picked on 2026-11-06 — rank 1, rank 25 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://juno-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://juno-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: 980644C9C8033945BA54EF32C053C395D0269EEA
+  - name: bottom-validator
+    role: validator
+    validator_address: 468F19774D884937ECAC184F1704B280A52684C5
+  - name: jailed
+    role: validator
+    validator_address: 4947683341BA5ED2E583032F237AF51E9FB98E82

@@ -26,11 +26,17 @@ type fakeREST struct {
 	validators []map[string]any
 	plan       map[string]any
 	proposals  []map[string]any
+	absent     []string // path prefixes of modules the chain does not have
 }
 
 func (fr *fakeREST) serve(w http.ResponseWriter, path string) {
 	w.Header().Set("Content-Type", "application/json")
 	var body any
+	for _, prefix := range fr.absent {
+		if strings.HasPrefix(path, prefix) {
+			path = "absent"
+		}
+	}
 	switch {
 	case path == "/cosmos/base/tendermint/v1beta1/node_info":
 		body = map[string]any{"default_node_info": map[string]any{"network": fr.network}}
@@ -241,6 +247,47 @@ func TestNoSigningInfo(t *testing.T) {
 	r, _ := f.Validator(context.Background(), "v", 20)
 	if codesOf(r.Findings)["no_signing_info"] != analysis.Warn {
 		t.Fatalf("findings = %v", codesOf(r.Findings))
+	}
+}
+
+// ICS consumer chains (Stride, for example) have no x/slashing or x/staking:
+// the REST API answers 501 Not Implemented, and the validator is judged on
+// liveness alone rather than reported unknown forever.
+func TestChainWithoutSlashing(t *testing.T) {
+	d := newTestValidator(t)
+	fc := &fakeChain{
+		height: 60, set: func(int64) []string { return []string{d.hex} }, flag: allSigned,
+		nodes: map[string]*fakeNode{"sentry": {}},
+		rest:  &fakeREST{network: "testchain-1", absent: []string{"/cosmos/slashing/", "/cosmos/staking/"}},
+	}
+	f := newFleet(t, fc, []config.Node{{Name: "sentry", Role: config.RoleSentry}, {Name: "v", Role: config.RoleValidator, ValidatorAddress: d.hex}}, false)
+	r, err := f.Validator(context.Background(), "v", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Level != analysis.OK || r.Cosmos.Error != nil || r.Cosmos.Unsupported == "" || r.Cosmos.MissesUntilJail != nil {
+		t.Fatalf("level = %s, cosmos = %+v", r.Level, r.Cosmos)
+	}
+	if codesOf(r.Findings)["no_slashing_module"] != analysis.OK {
+		t.Fatalf("findings = %v", r.Findings)
+	}
+}
+
+// Chains without x/gov (Noble, whose upgrades are scheduled by an authority)
+// still get the x/upgrade plan checked.
+func TestUpgradeOnChainWithoutGov(t *testing.T) {
+	fc := &fakeChain{
+		height: 1000, set: fourVals, flag: allSigned,
+		nodes: map[string]*fakeNode{"sentry": {}},
+		rest:  &fakeREST{network: "testchain-1", absent: []string{"/cosmos/gov/"}},
+	}
+	f := newFleet(t, fc, []config.Node{{Name: "sentry", Role: config.RoleSentry}}, false)
+	r, err := f.Upgrade(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Level != analysis.OK || codesOf(r.Findings)["no_gov_v1"] != analysis.OK {
+		t.Fatalf("level = %s, findings = %v", r.Level, r.Findings)
 	}
 }
 

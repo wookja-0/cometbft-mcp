@@ -114,6 +114,14 @@ func TestJudgeSlashingNotBonded(t *testing.T) {
 	if _, fs := JudgeSlashing(s); codes(fs)["not_bonded"] != Warn {
 		t.Fatalf("got %v", codes(fs))
 	}
+	// Seen on Cosmos Hub: a validator pushed out of the set by stake, with
+	// misses from before it left. Out of the set it cannot be jailed for
+	// downtime, so there is no margin or time to jail.
+	s.Status, s.Missed, s.MissStreak = "BOND_STATUS_UNBONDING", 24, 20
+	v, fs := JudgeSlashing(s)
+	if !v.Untracked || v.TimeToJail != 0 || len(fs) != 1 || fs[0].Code != "not_bonded" {
+		t.Fatalf("view = %+v, findings = %v", v, codes(fs))
+	}
 }
 
 func TestJudgeUpgrade(t *testing.T) {

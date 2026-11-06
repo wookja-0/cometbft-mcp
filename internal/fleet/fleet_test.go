@@ -39,6 +39,8 @@ type fakeChain struct {
 	rest  *fakeREST // served under /rest/ when set
 	// onValidators, if set, is called on every /validators request.
 	onValidators func()
+	// commitFails, if set, makes /commit at height h return an RPC error.
+	commitFails func(h int64) bool
 }
 
 type fakeNode struct {
@@ -122,6 +124,9 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 		ch, _ := strconv.ParseInt(q.Get("height"), 10, 64)
 		if ch > h || ch < 1 {
 			return nil, fmt.Sprintf("height %d must be less than or equal to the current blockchain height %d", ch, h)
+		}
+		if fc.commitFails != nil && fc.commitFails(ch) {
+			return nil, "internal error"
 		}
 		set := fc.set(ch)
 		var sigs []any
@@ -268,6 +273,22 @@ func TestValidatorDownIsDetectedFromSentry(t *testing.T) {
 	}
 	if r.Level != analysis.Critical || r.ActiveSet == nil || !r.ActiveSet.InSet || r.ActiveSet.Rank != 4 || r.ActiveSet.PowerSharePct != 10 {
 		t.Fatalf("level = %s, active set = %+v", r.Level, r.ActiveSet)
+	}
+}
+
+func TestUnreadableCommitsAreInTheSummary(t *testing.T) {
+	fc := &fakeChain{
+		height: 100, set: fourVals, flag: allSigned,
+		nodes:       map[string]*fakeNode{"sentry": {}},
+		commitFails: func(h int64) bool { return h%4 == 0 },
+	}
+	f := newFleet(t, fc, []config.Node{{Name: "sentry", Role: config.RoleSentry}, {Name: "v", Role: config.RoleValidator, ValidatorAddress: addrA}}, false)
+	r, err := f.Validator(context.Background(), "v", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Unreadable != 5 || r.Level != analysis.Unknown || !strings.Contains(r.Summary, "signed 15/15 readable blocks, 5 unreadable") {
+		t.Fatalf("unreadable = %d, summary = %s", r.Unreadable, r.Summary)
 	}
 }
 

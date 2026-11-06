@@ -1,0 +1,17 @@
+# kava: validators picked on 2026-11-06 — rank 1, rank 49 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://kava-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://kava-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: 441B24FB1D0E9354F084A4360DE6918273CD6BF8
+  - name: bottom-validator
+    role: validator
+    validator_address: AEFC8D9843BAAF1739C1B831E2091D9C75EC3F27
+  - name: jailed
+    role: validator
+    validator_address: 6DEA0A253A59FA6526EC622B6B3B87AA8B5FE596

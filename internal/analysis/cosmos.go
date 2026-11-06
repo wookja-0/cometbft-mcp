@@ -58,6 +58,7 @@ type SlashingView struct {
 	MissesUntilJail  int64         // further misses tolerated; the next one after this jails
 	GraceUntilHeight int64         // downtime jail cannot trigger at or before this height; 0 if past
 	TimeToJail       time.Duration // only when the validator is not signing right now (MissStreak ≥ StreakCritical)
+	Untracked        bool          // not bonded: x/slashing does not count its blocks, so there is no margin
 }
 
 // Margins below these fractions of MaxMissed raise warn / critical.
@@ -77,8 +78,13 @@ func JudgeSlashing(s Slashing) (SlashingView, []Finding) {
 	case s.Jailed:
 		return v, append(fs, Finding{Critical, "jailed", fmt.Sprintf("jailed; the jail period ended at %s — send an unjail transaction to rejoin", s.JailedUntil.UTC().Format(time.RFC3339))})
 	}
+	// x/slashing's BeginBlocker only handles the last commit's votes
+	// (sdkCtx.VoteInfos()), i.e. the bonded set, so a validator outside it
+	// accrues no misses and cannot be jailed for downtime:
+	// https://github.com/cosmos/cosmos-sdk/blob/v0.53.0/x/slashing/abci.go
 	if s.Status != "" && s.Status != "BOND_STATUS_BONDED" {
-		fs = append(fs, Finding{Warn, "not_bonded", fmt.Sprintf("staking status is %s: not in the active set (not jailed, so most likely too little stake)", bondStatus(s.Status))})
+		v.Untracked = true
+		return v, append(fs, Finding{Warn, "not_bonded", fmt.Sprintf("staking status is %s: not in the active set (not jailed, so most likely too little stake); no downtime jail risk while out of the set", bondStatus(s.Status))})
 	}
 
 	v.MissesUntilJail = max(s.MaxMissed-s.Missed, 0)

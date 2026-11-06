@@ -1,0 +1,17 @@
+# dydx: validators picked on 2026-11-06 — rank 1, rank 21 (last in the active set), and the highest-stake jailed, unbonded one. Their state can change.
+# They are not ours, so they are watched by address only (no rpc).
+cosmos:
+  rest: https://dydx-rest.publicnode.com
+nodes:
+  - name: rpc
+    role: full
+    rpc: https://dydx-rpc.publicnode.com:443
+  - name: top-validator
+    role: validator
+    validator_address: 9CF6B9DC6AB6C65974641774CE4B910C2466EB21
+  - name: bottom-validator
+    role: validator
+    validator_address: 4EA5E26C2F2165C313EB54DFFC7E81117A32033D
+  - name: jailed
+    role: validator
+    validator_address: E389C599661E128828D6ECCFE3304CB77E9643B8

@@ -103,6 +103,24 @@ func TestSigningInfoNotFound(t *testing.T) {
 	}
 }
 
+// What Stride (an ICS consumer chain, no x/slashing) answers on stride-1.
+func TestAbsentModuleIsUnimplemented(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotImplemented)
+		w.Write([]byte(`{"code":12,"message":"Not Implemented","details":[]}`))
+	}))
+	defer srv.Close()
+	u, _ := url.Parse(srv.URL)
+	_, err := NewClient(safehttp.New(safehttp.Options{}), u).SlashingParams(context.Background())
+	if !IsUnimplemented(err) {
+		t.Fatalf("err = %v", err)
+	}
+	if IsUnimplemented(&Error{Code: CodeRESTError}) || IsUnimplemented(nil) {
+		t.Fatal("only gRPC Unimplemented means the module is absent")
+	}
+}
+
 func TestNonRESTEndpointIsExplained(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("<html>"))
