@@ -15,6 +15,15 @@ func TestSetupErrorMissingFile(t *testing.T) {
 	if !strings.Contains(got, "no config file at /home/op/.config/cometbft-mcp/config.yaml") || !strings.Contains(got, exampleConfigURL) {
 		t.Fatalf("got %q", got)
 	}
+	// Hosted runners (Glama's Try in Browser) start without a config: the
+	// message carries a public-endpoint config that can be pasted as is.
+	if !strings.Contains(got, config.EnvInline+" to "+publicExampleConfig) {
+		t.Fatalf("no pasteable example: %q", got)
+	}
+	cfg, err := config.Source{Inline: publicExampleConfig}.Load()
+	if err != nil || cfg.Cosmos == nil || len(cfg.Nodes) != 1 {
+		t.Fatalf("example config: %+v, %v", cfg, err)
+	}
 }
 
 // An invalid config's parse error can quote its values (internal node

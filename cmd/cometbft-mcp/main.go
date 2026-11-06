@@ -114,6 +114,10 @@ func run(args []string) error {
 
 const exampleConfigURL = "https://github.com/wookja-0/cometbft-mcp/blob/main/config.example.yaml"
 
+// publicExampleConfig watches Cosmos Hub through public endpoints. It is only
+// suggested in the setup message, never used unless the user sets it.
+const publicExampleConfig = `{cosmos: {rest: "https://cosmos-rest.publicnode.com"}, nodes: [{name: public, role: full, rpc: "https://cosmos-rpc.publicnode.com:443"}]}`
+
 // setupError tells the user (through the model) how to fix the config. It
 // never includes the parse error itself: YAML errors quote config values,
 // such as internal node addresses, which must not reach the model.
@@ -122,7 +126,7 @@ func setupError(src config.Source, err error) error {
 	case src.Inline != "":
 		return fmt.Errorf("the YAML in $%s is invalid. Run `cometbft-mcp check` with the same environment to see why (format: %s), fix it, then restart the MCP server", config.EnvInline, exampleConfigURL)
 	case errors.Is(err, fs.ErrNotExist):
-		return fmt.Errorf("no config file at %s. Create it from %s with your nodes' CometBFT RPC URLs (and optionally a Cosmos REST URL), or put the YAML in $%s, then restart the MCP server", src.Path, exampleConfigURL, config.EnvInline)
+		return fmt.Errorf("no config file at %s. Create it from %s with your nodes' CometBFT RPC URLs (and optionally a Cosmos REST URL), or put the YAML in $%s, then restart the MCP server. To try it on Cosmos Hub's public endpoints first, set $%s to %s", src.Path, exampleConfigURL, config.EnvInline, config.EnvInline, publicExampleConfig)
 	}
 	return fmt.Errorf("the config file at %s is invalid. Run `cometbft-mcp check --config %s` in a terminal to see why, fix it, then restart the MCP server", src.Path, src.Path)
 }
