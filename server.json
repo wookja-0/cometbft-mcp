@@ -3,7 +3,7 @@
   "name": "io.github.wookja-0/cometbft-mcp",
   "title": "CometBFT validator ops",
   "description": "Read-only health, jail-risk, halt and upgrade checks for CometBFT validators and nodes",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "repository": {
     "url": "https://github.com/wookja-0/cometbft-mcp",
     "source": "github"
@@ -11,7 +11,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/wookja-0/cometbft-mcp:0.4.3",
+      "identifier": "ghcr.io/wookja-0/cometbft-mcp:0.4.4",
       "transport": {
         "type": "stdio"
       },
