@@ -57,6 +57,9 @@ type fakeNode struct {
 	atHeightFor time.Duration
 	round       int
 	step        int // consensus step; 0 means Prevote (4)
+	// freshRound leaves the current round without votes, as right after a
+	// new round starts; earlier rounds keep the votes from seen.
+	freshRound bool
 }
 
 type fakePeer struct {
@@ -167,15 +170,19 @@ func (fc *fakeChain) handle(n *fakeNode, path string, r *http.Request) (any, str
 		if step == 0 {
 			step = 4
 		}
-		var rounds []any
-		for r := 0; r <= n.round; r++ {
-			rounds = append(rounds, map[string]any{"round": r, "prevotes": pv, "precommits": pc, "prevotes_bit_array": "", "precommits_bit_array": ""})
-		}
-		// Like CometBFT, also list the next round, still empty.
 		empty := make([]string, len(pv))
 		for i := range empty {
 			empty[i] = "nil-Vote"
 		}
+		var rounds []any
+		for r := 0; r <= n.round; r++ {
+			rpv, rpc := pv, pc
+			if n.freshRound && r == n.round {
+				rpv, rpc = empty, empty
+			}
+			rounds = append(rounds, map[string]any{"round": r, "prevotes": rpv, "precommits": rpc, "prevotes_bit_array": "", "precommits_bit_array": ""})
+		}
+		// Like CometBFT, also list the next round, still empty.
 		rounds = append(rounds, map[string]any{"round": n.round + 1, "prevotes": empty, "precommits": empty, "prevotes_bit_array": "", "precommits_bit_array": ""})
 		return map[string]any{"round_state": map[string]any{
 			"height/round/step": fmt.Sprintf("%d/%d/%d", cur, n.round, step),

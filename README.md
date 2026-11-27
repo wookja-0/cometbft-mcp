@@ -346,7 +346,7 @@ The live round as one node sees it: height, round, step, time at this height, ea
 |---|---|
 | `node` | Node to read from; default a synced sentry or full node |
 
-Findings: `no_quorum` (names who is not voting), `stuck_with_quorum`, `many_rounds`, `vote_set_mismatch`.
+Findings: `no_quorum` (names who is not voting — at the prevotes, or at the precommits when a validator went down after prevoting), `stuck_with_quorum`, `many_rounds`, `vote_set_mismatch`. On a stalled height a new round starts every few seconds with no votes yet; then the previous round's votes are judged, and `votes_round` says which round they are from.
 </details>
 
 <details>
@@ -380,7 +380,7 @@ Threat model and reporting: [SECURITY.md](SECURITY.md).
 
 **Jail risk.** With the Cosmos SDK layer it reads the chain's own inputs — `x/slashing` params and signing info, and `x/staking` matched by consensus key — and computes the threshold exactly as `x/slashing` does: `window − round_half_even(window × min_signed_per_window)`, including the grace period before `start_height + window`. A future `jailed_until` counts as jailed even if the staking lookup fails, because jailing resets the miss counter and would otherwise look like a clean record. `x/slashing` only counts the bonded set, so a validator outside it has no margin and no time to jail.
 
-**Halts.** CometBFT needs more than 2/3 of voting power to prevote and precommit. `consensus_diagnosis` reads the current round's votes (CometBFT also lists the next round, still empty, which is skipped), checks each vote against the validator at its position, and sums the power that has voted.
+**Halts.** CometBFT needs more than 2/3 of voting power to prevote and precommit. `consensus_diagnosis` reads the current round's votes (CometBFT also lists the next round, still empty, which is skipped), checks each vote against the validator at its position, and sums the power that has voted. Online validators precommit (for the block or nil) once they see more than 2/3 prevotes, so when the prevotes have a quorum and the precommits never get one, the validators missing from the precommits are the ones that stopped — a node that went down mid-round.
 
 ## Compatibility
 

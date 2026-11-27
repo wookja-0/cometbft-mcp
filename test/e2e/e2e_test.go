@@ -325,11 +325,16 @@ func TestChainHalt(t *testing.T) {
 	t.Logf("halted: %s", r["summary"])
 	fs := r["findings"].([]any)[0].(map[string]any)
 	pv := r["prevotes"].(map[string]any)
-	if fs["code"] != "no_quorum" || pv["quorum"] != false || pv["missing"].(float64) != 2 {
+	pc := r["precommits"].(map[string]any)
+	// The quorum is missing at the prevotes, or at the precommits when a
+	// validator was stopped after it had already prevoted this round.
+	if fs["code"] != "no_quorum" || (pv["quorum"] != false && pc["quorum"] != false) {
 		t.Fatalf("diagnosis: %v", r)
 	}
-	if !strings.Contains(r["summary"].(string), "not voting: val2, val3") && !strings.Contains(r["summary"].(string), "not voting: val3, val2") {
-		t.Fatalf("summary should name val2 and val3: %s", r["summary"])
+	summary := r["summary"].(string)
+	_, named, _ := strings.Cut(summary, "; not ")
+	if !strings.Contains(named, "val2") || !strings.Contains(named, "val3") {
+		t.Fatalf("summary should name val2 and val3: %s", summary)
 	}
 
 	ov := call(t, s, "fleet_overview", nil)

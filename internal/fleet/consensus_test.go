@@ -74,6 +74,62 @@ func TestConsensusStuckWithQuorum(t *testing.T) {
 	}
 }
 
+// The e2e halt test caught this: a validator that prevoted and then went
+// down leaves a prevote quorum, so the stall is in the precommits, and the
+// summary must name who is missing there.
+func TestConsensusValidatorDownAfterPrevoting(t *testing.T) {
+	// Powers 40/30/20/10: A, B and C prevoted (90%); only A and C precommitted (60%).
+	fc := &fakeChain{height: 100, set: fourVals, flag: allSigned, nodes: map[string]*fakeNode{
+		"sentry": {
+			atHeightFor: 2 * time.Minute,
+			step:        6, // Precommit
+			seen:        func(a string) (bool, bool) { return a != addrD, a == addrA || a == addrC },
+		},
+	}}
+	f := newFleet(t, fc, []config.Node{
+		{Name: "sentry", Role: config.RoleSentry},
+		{Name: "val-b", Role: config.RoleValidator, ValidatorAddress: addrB},
+	}, false)
+	r, err := f.Consensus(context.Background(), "sentry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Prevotes.Quorum || r.Precommits.Quorum || codesOf(r.Findings)["no_quorum"] != analysis.Critical {
+		t.Fatalf("report = %+v", r)
+	}
+	if !strings.Contains(r.Summary, "not precommitting: val-b, DDDDDDDDDDDD…") {
+		t.Fatalf("summary = %s", r.Summary)
+	}
+}
+
+// On a stalled height a new round starts every few seconds with no votes
+// yet; judging that empty round would name every validator as missing.
+func TestConsensusStalledFreshRoundUsesPreviousRound(t *testing.T) {
+	fc := &fakeChain{height: 100, set: fourVals, flag: allSigned, nodes: map[string]*fakeNode{
+		"sentry": {
+			atHeightFor: 3 * time.Minute,
+			round:       5,
+			step:        3, // Propose
+			freshRound:  true,
+			seen:        func(a string) (bool, bool) { return a != addrB && a != addrD, false },
+		},
+	}}
+	f := newFleet(t, fc, []config.Node{
+		{Name: "sentry", Role: config.RoleSentry},
+		{Name: "val-b", Role: config.RoleValidator, ValidatorAddress: addrB},
+	}, false)
+	r, err := f.Consensus(context.Background(), "sentry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Round != 5 || r.VotesRound != 4 || r.Prevotes.Missing != 2 || codesOf(r.Findings)["no_quorum"] != analysis.Critical {
+		t.Fatalf("report = %+v", r)
+	}
+	if !strings.Contains(r.Summary, "votes from round 4") || !strings.Contains(r.Summary, "not voting: val-b, DDDDDDDDDDDD…") {
+		t.Fatalf("summary = %s", r.Summary)
+	}
+}
+
 func TestConsensusUnknownNode(t *testing.T) {
 	fc := &fakeChain{height: 10, set: fourVals, flag: allSigned, nodes: map[string]*fakeNode{"s": {}}}
 	f := newFleet(t, fc, []config.Node{{Name: "s", Role: config.RoleSentry}}, false)
