@@ -9,10 +9,11 @@ Human contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md). This file is 
 ```bash
 make test          # unit tests (no network)
 make lint          # go vet + gofmt
+make vuln          # govulncheck (CI and release run it; a stale Go toolchain fails here)
 make build         # bin/cometbft-mcp
 make localnet-up   # 4 validators + 1 sentry in Docker (localnet/)
 make e2e           # MCP over stdio against the localnet (downtime, jail + unjail, upgrade proposal, chain halt; mutates chain state)
-go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 11 mainnets' public endpoints (~2 min)
+go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 10 mainnets' public endpoints (~2 min)
 ```
 
 ## Map

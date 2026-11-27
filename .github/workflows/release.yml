@@ -33,6 +33,7 @@ jobs:
 
       - run: make lint
       - run: go test -race ./...
+      - run: make vuln
 
       - name: Build binaries
         run: |

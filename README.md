@@ -398,7 +398,7 @@ Tested on 2026-11-06 against 11 mainnets through public endpoints, read-only (`t
 | Juno | 0.38.22 | 0.53.7 | |
 | Kava | 0.37.16 | 0.47.15 | |
 | Noble | 0.38.19 | 0.50.14 | No `x/gov` (authority-run): the upgrade plan is checked, proposals are not |
-| Stride | 0.39.0 | 0.54.3 | ICS consumer, no `x/slashing`: judged on signing liveness alone |
+| Stride | 0.39.0 | 0.54.3 | ICS consumer, no `x/slashing`: judged on signing liveness alone. Its public RPC endpoints were all offline on 2026-11-27, so it is no longer in the recurring smoke test |
 | localnet (simd) | 0.39.4 | 0.54.4 | e2e: downtime, jail + unjail, upgrade, halt |
 
 Versions are what the chains' `/status` and `node_info` reported. ed25519 consensus keys only. Not supported: Tendermint2 (gno.land).
@@ -438,7 +438,7 @@ make test           # unit tests, no network
 make lint
 make localnet-up    # 4 validators + 1 sentry (simd) in Docker; writes localnet/config.yaml
 make e2e            # MCP over stdio: downtime, a real jail + unjail, an upgrade proposal, a chain halt (~5 min)
-go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 11 mainnets' public endpoints (~2 min)
+go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 10 mainnets' public endpoints (~2 min)
 ```
 
 The localnet's genesis is tuned so failures show up in seconds (50-block slashing window, 50% min signed, 60 s jail, 30 s voting). Try it interactively:

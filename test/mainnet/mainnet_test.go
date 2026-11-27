@@ -35,7 +35,9 @@ import (
 
 // noSlashing lists chains without x/slashing and x/staking (ICS consumer
 // chains): the Cosmos layer must say so and judge on liveness alone.
-var noSlashing = map[string]bool{"stride": true}
+// None at the moment: Stride, tested on 2026-11-06, had no public RPC left
+// on 2026-11-27 (TestChainWithoutSlashing keeps the path covered).
+var noSlashing = map[string]bool{}
 
 func configs(t *testing.T) []string {
 	if path := os.Getenv("COMETBFT_MCP_MAINNET_CONFIG"); path != "" {
