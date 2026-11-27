@@ -50,4 +50,5 @@ jobs:
           go-version-file: go.mod
       - run: make lint
       - run: go test -race ./...
+      - run: make vuln
       - run: docker build -t cometbft-mcp:ci .

@@ -3,7 +3,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMPOSE := docker compose -f localnet/docker-compose.yml
 SIMD_IMAGE := cometbft-mcp/simd:v0.54.4
 
-.PHONY: build test lint e2e localnet-image simd-image-name localnet-up localnet-down localnet-stop localnet-start
+.PHONY: build test lint vuln e2e localnet-image simd-image-name localnet-up localnet-down localnet-stop localnet-start
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o $(BIN) ./cmd/cometbft-mcp
@@ -15,6 +15,11 @@ lint:
 	go vet ./...
 	go vet -tags localnet ./test/...
 	@test -z "$$(gofmt -l .)" || (gofmt -l . && echo "gofmt needed" && exit 1)
+
+# Known vulnerabilities in the code paths we actually call (stdlib included,
+# so a stale Go toolchain fails here). Pinned like every other tool.
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 
 # End-to-end over MCP stdio against the localnet (stops/starts val3).
 e2e:

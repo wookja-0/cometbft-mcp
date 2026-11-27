@@ -20,6 +20,7 @@ For anything larger than a small fix, open an issue first so we can agree on the
 ```bash
 make test           # unit tests, no network
 make lint           # go vet + gofmt
+make vuln           # govulncheck: known vulnerabilities in code we call
 make build          # bin/cometbft-mcp
 ```
 
@@ -29,7 +30,7 @@ To see changes against a real chain:
 make localnet-up    # 4 validators + 1 sentry (simd); writes localnet/config.yaml
 make e2e            # MCP over stdio: downtime, jail + unjail, upgrade proposal, chain halt (~5 min)
 make localnet-down
-go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 11 mainnets' public endpoints (~2 min)
+go test -tags mainnet -v ./test/mainnet/   # read-only smoke test on 10 mainnets' public endpoints (~2 min)
 ```
 
 The code map is in [AGENTS.md](AGENTS.md#map).
