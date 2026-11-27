@@ -44,12 +44,18 @@ type Vote struct {
 
 // Current returns the votes of the round in progress.
 func (rs *RoundState) Current() RoundVotes {
+	v, _ := rs.Votes(rs.Round)
+	return v
+}
+
+// Votes returns the votes of one round of the current height.
+func (rs *RoundState) Votes(round int32) (RoundVotes, bool) {
 	for _, r := range rs.Rounds {
-		if r.Round == rs.Round {
-			return r
+		if r.Round == round {
+			return r, true
 		}
 	}
-	return RoundVotes{Round: rs.Round}
+	return RoundVotes{Round: round}, false
 }
 
 // Step names, from consensus/types/round_state.go.

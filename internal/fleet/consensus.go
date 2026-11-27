@@ -26,6 +26,7 @@ type ConsensusReport struct {
 	SourceNode        string               `json:"source_node"`
 	Height            int64                `json:"height"`
 	Round             int32                `json:"round"`
+	VotesRound        int32                `json:"votes_round"` // round the votes below are from; Round, or Round-1 right after a stalled height starts a new round
 	Step              string               `json:"step"`
 	SecondsAtHeight   float64              `json:"seconds_at_height"`
 	TotalPower        int64                `json:"total_power"`
@@ -105,11 +106,18 @@ func (f *Fleet) Consensus(ctx context.Context, node string) (*ConsensusReport, e
 	}
 
 	current := rs.Current()
+	// On a stalled height a new round starts every few seconds, and until
+	// its votes arrive every validator looks missing. Judge the round before.
+	stalled := now.Sub(rs.StartTime) >= f.thresholds.StaleWarn
+	if prev, ok := rs.Votes(rs.Round - 1); ok && stalled && earlySteps[r.Step] {
+		current = prev
+	}
+	r.VotesRound = current.Round
 	names := f.validatorNames()
 	monikers := f.monikers(ctx)
 
-	var prevotePower, precommitPower, missingPower int64
-	var missing []string
+	var prevotePower, precommitPower, missingPower, missingPrecommitPower int64
+	var missing, missingPrecommits []string
 	var all []ConsensusValidator
 	mismatched := 0
 	tally := func(votes []comet.Vote, i int, addr string, power int64, t *VoteTally, sum *int64) string {
@@ -140,6 +148,10 @@ func (f *Fleet) Consensus(ctx context.Context, node string) (*ConsensusReport, e
 			missingPower += power
 			missing = append(missing, cv.label())
 		}
+		if cv.Precommit == "missing" {
+			missingPrecommitPower += power
+			missingPrecommits = append(missingPrecommits, cv.label())
+		}
 		if v.Address == rs.Proposer.Address {
 			r.Proposer = cv.label()
 		}
@@ -159,16 +171,18 @@ func (f *Fleet) Consensus(ctx context.Context, node string) (*ConsensusReport, e
 	}
 
 	r.Findings = append(r.Findings, analysis.JudgeConsensus(analysis.Consensus{
-		Now:             now,
-		Height:          rs.Height,
-		Round:           rs.Round,
-		StartTime:       rs.StartTime,
-		TotalPower:      r.TotalPower,
-		PrevotePower:    prevotePower,
-		PrecommitPower:  precommitPower,
-		MissingPrevotes: missing,
-		MissingPower:    missingPower,
-		StuckAfter:      f.thresholds.StaleWarn,
+		Now:                   now,
+		Height:                rs.Height,
+		Round:                 rs.Round,
+		StartTime:             rs.StartTime,
+		TotalPower:            r.TotalPower,
+		PrevotePower:          prevotePower,
+		PrecommitPower:        precommitPower,
+		MissingPrevotes:       missing,
+		MissingPower:          missingPower,
+		MissingPrecommits:     missingPrecommits,
+		MissingPrecommitPower: missingPrecommitPower,
+		StuckAfter:            f.thresholds.StaleWarn,
 	})...)
 	r.Level = analysis.LevelOf(r.Findings)
 	r.Summary = consensusSummary(r)
@@ -260,6 +274,9 @@ func pctOf(p, total int64) float64 {
 func consensusSummary(r *ConsensusReport) string {
 	s := fmt.Sprintf("height %d round %d (%s) for %.0fs [%s]: prevotes %.1f%%, precommits %.1f%% of power",
 		r.Height, r.Round, r.Step, r.SecondsAtHeight, r.Level, r.Prevotes.ReceivedPct, r.Precommits.ReceivedPct)
+	if r.VotesRound != r.Round {
+		s += fmt.Sprintf(" (votes from round %d; round %d just started)", r.VotesRound, r.Round)
+	}
 	if issue := firstMessage(r.Findings, nil); issue != "" {
 		s += " — " + issue
 	}
@@ -271,9 +288,15 @@ func consensusSummary(r *ConsensusReport) string {
 		}
 		return s // votes still arriving in a healthy round are not news
 	}
+	// Name who blocks the stage that lacks a quorum: prevotes, or the
+	// precommits when the prevotes got there.
+	label, precommitStage := "not voting", r.Prevotes.Quorum && !r.Precommits.Quorum && r.Precommits.ReceivedPct > 0
+	if precommitStage {
+		label = "not precommitting"
+	}
 	var missing []string
 	for _, v := range r.Validators {
-		if v.Prevote == "missing" {
+		if (precommitStage && v.Precommit == "missing") || (!precommitStage && v.Prevote == "missing") {
 			missing = append(missing, v.label())
 		}
 	}
@@ -282,7 +305,7 @@ func consensusSummary(r *ConsensusReport) string {
 		missing = append(missing[:maxNamed], fmt.Sprintf("and %d more", n-maxNamed))
 	}
 	if len(missing) > 0 {
-		s += "; not voting: " + strings.Join(missing, ", ")
+		s += "; " + label + ": " + strings.Join(missing, ", ")
 	}
 	return s
 }

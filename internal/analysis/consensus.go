@@ -24,7 +24,10 @@ type Consensus struct {
 	// Validators with no prevote in the current round, already labeled.
 	MissingPrevotes []string
 	MissingPower    int64
-	StuckAfter      time.Duration
+	// Validators with no precommit in the current round, already labeled.
+	MissingPrecommits     []string
+	MissingPrecommitPower int64
+	StuckAfter            time.Duration
 }
 
 // ManyRounds flags a height that needed several rounds even if it is moving.
@@ -51,6 +54,20 @@ func JudgeConsensus(c Consensus) []Finding {
 		return []Finding{{Critical, "no_quorum", fmt.Sprintf(
 			"%s: only %.1f%% of voting power is voting, and more than 66.7%% is needed. Not voting (%.1f%% of power): %s",
 			where, pct(c.PrevotePower), pct(c.MissingPower), missing)}}
+	}
+	// A polka without enough precommits: online validators precommit (for
+	// the block or nil) once they see +2/3 prevotes, so the ones missing
+	// here stopped after prevoting — typically a node that went down mid-round.
+	// If nobody precommits at all, every validator is stalled: not a power
+	// problem, so that falls through to stuck_with_quorum.
+	if c.PrecommitPower > 0 && !HasQuorum(c.PrecommitPower, c.TotalPower) {
+		missing := "no validator is identifiable"
+		if len(c.MissingPrecommits) > 0 {
+			missing = strings.Join(c.MissingPrecommits, ", ")
+		}
+		return []Finding{{Critical, "no_quorum", fmt.Sprintf(
+			"%s: %.1f%% of voting power prevoted but only %.1f%% precommitted, and more than 66.7%% is needed to commit. Not precommitting (%.1f%% of power): %s",
+			where, pct(c.PrevotePower), pct(c.PrecommitPower), pct(c.MissingPrecommitPower), missing)}}
 	}
 	return []Finding{{Critical, "stuck_with_quorum", fmt.Sprintf(
 		"%s although %.1f%% of voting power is prevoting and %.1f%% precommitting: validators are online but not committing a block — "+
